@@ -26,8 +26,8 @@ export interface InvoiceAnalysisResult {
   hasEnoughData: boolean;
 }
 
-// Regex for Indian currency formats: ₹8,500 / ₹ 8,500 / 8,500 / ₹1,06,790 etc.
-const CURRENCY_REGEX = /[₹]?\s?\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?/g;
+// Regex for Indian currency formats: Rs.8,500 / Rs. 8,500 / ₹8,500 / 8,500 / Rs.1,06,790 etc.
+const CURRENCY_REGEX = /(?:Rs\.?\s?|₹\s?)\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?/g;
 
 // Words that suggest a role
 const SUBTOTAL_KEYWORDS = ["subtotal", "sub total", "sub-total", "amount"];
@@ -39,8 +39,8 @@ const TOTAL_KEYWORDS = ["total", "grand total", "amount due", "balance due", "ne
  * Handles: ₹8,500 / ₹ 8,500 / 8,500 / ₹1,06,790
  */
 function parseIndianCurrency(text: string): number | null {
-  // Remove currency symbol and whitespace
-  const cleaned = text.replace(/[₹\s]/g, "").trim();
+  // Remove currency symbol/prefix and whitespace
+  const cleaned = text.replace(/(?:Rs\.?\s?|₹\s?)/g, "").trim();
   if (!cleaned) return null;
 
   // Remove commas

@@ -29,10 +29,10 @@ export const DEMO_FILES: DemoFile[] = [
   {
     id: "manipulated-invoice",
     name: "Altered_Invoice_2024.pdf",
-    description: "A deliberately manipulated invoice with amount ₹8,500 changed to ₹18,500.",
+    description: "A deliberately manipulated invoice with amount Rs.8,500 changed to Rs.18,500.",
     type: "application/pdf",
     isManipulated: true,
-    manipulation: "Amount modified: ₹8,500 → ₹18,500",
+    manipulation: "Amount modified: Rs.8,500 → Rs.18,500",
   },
 ];
 
@@ -158,7 +158,7 @@ export async function generateDemoInvoicePdf(
     page.drawText(item.desc, { x: 55, y, size: 10, font, color: black });
     page.drawText(item.qty, { x: 345, y, size: 10, font, color: black });
     page.drawText(item.rate, { x: 395, y, size: 10, font, color: black });
-    page.drawText(`₹${item.amount}`, { x: 470, y, size: 10, font: itemFont, color: itemColor });
+    page.drawText(`Rs.${item.amount}`, { x: 470, y, size: 10, font: itemFont, color: itemColor });
 
     y -= 25;
   }
@@ -176,14 +176,14 @@ export async function generateDemoInvoicePdf(
   // Subtotal — if manipulated, use wrong total (80,500→90,500 arithmetic error)
   const subtotal = manipulated ? "90,500" : "80,500";
   page.drawText("Subtotal:", { x: 385, y, size: 10, font, color: gray });
-  page.drawText(`₹${subtotal}`, { x: 470, y, size: 10, font: manipulated ? boldFont : font, color: manipulated ? red : black });
+  page.drawText(`Rs.${subtotal}`, { x: 470, y, size: 10, font: manipulated ? boldFont : font, color: manipulated ? red : black });
 
   y -= 22;
 
   // Tax
   const tax = manipulated ? "16,290" : "14,490";
   page.drawText("GST (18%):", { x: 385, y, size: 10, font, color: gray });
-  page.drawText(`₹${tax}`, { x: 470, y, size: 10, font, color: manipulated ? red : black });
+  page.drawText(`Rs.${tax}`, { x: 470, y, size: 10, font, color: manipulated ? red : black });
 
   y -= 15;
 
@@ -200,7 +200,7 @@ export async function generateDemoInvoicePdf(
   // Total
   const total = manipulated ? "1,06,790" : "94,990";
   page.drawText("TOTAL:", { x: 385, y, size: 12, font: boldFont, color: darkBlue });
-  page.drawText(`₹${total}`, { x: 465, y, size: 14, font: boldFont, color: manipulated ? red : darkBlue });
+  page.drawText(`Rs.${total}`, { x: 465, y, size: 14, font: boldFont, color: manipulated ? red : darkBlue });
 
   // Footer
   const footerY = 90;

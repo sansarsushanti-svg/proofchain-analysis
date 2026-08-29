@@ -113,46 +113,40 @@ export default function Analysis() {
     <div className="min-h-screen bg-background">
       <AppNav />
 
-      <main className="pt-20 min-h-screen">
-        <div className="max-w-2xl mx-auto px-6 pb-16">
+      <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen">
+        <div className="p-6 lg:p-10 max-w-4xl mx-auto">
           {error ? (
             <motion.div
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="border border-border bg-card p-10 text-center mt-16"
+              className="nb-card p-8 text-center"
             >
-              <p className="text-sm text-destructive font-medium mb-2">
+              <div className="w-16 h-16 bg-red-100 border-3 border-red-300 flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl">⚠</span>
+              </div>
+              <h2 className="text-xl font-black uppercase tracking-wider mb-2">
                 Analysis Failed
-              </p>
+              </h2>
               <p className="text-sm text-muted-foreground mb-6">{error}</p>
               <button
                 onClick={() => navigate("/upload")}
-                className="nb-btn-primary px-5 py-2.5 bg-foreground text-background"
+                className="nb-btn-primary px-6 py-3 bg-foreground text-background text-sm"
               >
                 Try Again
               </button>
             </motion.div>
           ) : (
             <motion.div
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-16"
             >
-              <div className="mb-8">
-                <span className="editorial-label">Analysis in progress</span>
-                <h1 className="font-display text-2xl mt-2">
-                  Running forensic pipeline
-                </h1>
+              <AnalysisProgress stages={stages} currentStageIndex={currentStageIndex} />
+
+              <div className="mt-8 text-center">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                  Please do not close this page during analysis
+                </p>
               </div>
-
-              <AnalysisProgress
-                stages={stages}
-                currentStageIndex={currentStageIndex}
-              />
-
-              <p className="text-xs text-muted-foreground text-center mt-8 font-mono">
-                Please do not close this page during analysis
-              </p>
             </motion.div>
           )}
         </div>

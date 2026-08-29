@@ -9,12 +9,9 @@ import { AiExplanation } from "@/components/forensic/AiExplanation";
 import { getFindingsSummary } from "@/lib/forensics/scoring";
 import type { ForensicFinding } from "@/lib/forensics/types";
 import { downloadReport } from "@/lib/reportGenerator";
-import {
-  generateAiExplanation,
-  type AiExplanation as AiExplanationType,
-} from "@/lib/ai";
+import { generateAiExplanation, type AiExplanation as AiExplanationType } from "@/lib/ai";
 import { motion } from "framer-motion";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft, Download, FileText } from "lucide-react";
 
 export default function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -24,7 +21,7 @@ export default function Results() {
     return (
       <div className="min-h-screen bg-background">
         <AppNav />
-        <main className="pt-20 min-h-screen flex items-center justify-center">
+        <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen flex items-center justify-center">
           <p className="text-sm text-muted-foreground">No session specified.</p>
         </main>
       </div>
@@ -38,14 +35,17 @@ export default function Results() {
     return (
       <div className="min-h-screen bg-background">
         <AppNav />
-        <main className="pt-20 min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground mb-4">
+        <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen flex items-center justify-center">
+          <div className="nb-card p-8 text-center max-w-md">
+            <h2 className="text-xl font-black uppercase tracking-wider mb-2">
+              Not Available
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6">
               This session could not be found.
             </p>
             <button
               onClick={() => navigate("/upload")}
-              className="nb-btn-primary px-5 py-2.5 bg-foreground text-background"
+              className="nb-btn-primary px-6 py-3 bg-foreground text-background text-sm"
             >
               New Analysis
             </button>
@@ -59,16 +59,19 @@ export default function Results() {
     return (
       <div className="min-h-screen bg-background">
         <AppNav />
-        <main className="pt-20 min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground mb-4">
+        <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen flex items-center justify-center">
+          <div className="nb-card p-8 text-center max-w-md">
+            <h2 className="text-xl font-black uppercase tracking-wider mb-2">
+              Not Available
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6">
               {session.status === "failed"
                 ? "This analysis failed to complete."
                 : "This session is still in progress or has not completed."}
             </p>
             <button
               onClick={() => navigate("/upload")}
-              className="nb-btn-primary px-5 py-2.5 bg-foreground text-background"
+              className="nb-btn-primary px-6 py-3 bg-foreground text-background text-sm"
             >
               New Analysis
             </button>
@@ -115,11 +118,7 @@ export default function Results() {
   const handleDownloadReport = () => {
     const result = {
       integrityScore: session.integrityScore || 0,
-      riskLevel: (session.riskLevel || "low") as
-        | "low"
-        | "moderate"
-        | "high"
-        | "critical",
+      riskLevel: (session.riskLevel || "low") as "low" | "moderate" | "high" | "critical",
       findings,
       metadata: {
         analysisTimestamp: new Date(session.createdAt).toISOString(),
@@ -136,53 +135,51 @@ export default function Results() {
     <div className="min-h-screen bg-background">
       <AppNav />
 
-      <main className="pt-20 min-h-screen">
-        <div className="max-w-6xl mx-auto px-6 pb-16">
+      <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen">
+        <div className="p-6 lg:p-10 max-w-7xl">
           {/* Header */}
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
             <button
               onClick={() => navigate("/dashboard")}
-              className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors mb-4"
+              className="flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors mb-4"
             >
-              ← Back to Dashboard
+              <ArrowLeft className="w-4 h-4" />
+              Back to Dashboard
             </button>
 
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-6 h-[1.5px] bg-accent" />
-                  <span className="editorial-label">Integrity Assessment</span>
-                </div>
-                <h1 className="font-display text-3xl">Results</h1>
-                <p className="text-xs text-muted-foreground mt-1 font-mono">
-                  {session.fileName} ·{" "}
-                  {new Date(session.createdAt).toLocaleString()}
+                <h1 className="text-3xl font-black uppercase tracking-tight">
+                  Results
+                </h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {session.fileName} · {new Date(session.createdAt).toLocaleString()}
                 </p>
               </div>
               <button
                 onClick={handleDownloadReport}
-                className="nb-btn-primary px-5 py-2.5 bg-foreground text-background flex items-center gap-2 self-start"
+                className="nb-btn-primary px-6 py-3 bg-foreground text-background flex items-center gap-2 self-start text-sm"
               >
                 <Download className="w-4 h-4" />
-                Generate Forensic Report →
+                Generate Report
               </button>
             </div>
           </motion.div>
 
-          {/* Main content */}
-          <div className="grid lg:grid-cols-[1fr_320px] gap-px bg-border border border-border">
+          {/* Main results layout */}
+          <div className="grid lg:grid-cols-[1fr_350px] gap-6">
             {/* Left column */}
-            <div className="bg-card">
-              {/* Score section */}
+            <div className="space-y-6">
+              {/* Integrity Score + Category Cards */}
               <motion.div
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="p-6 border-b border-border"
+                className="nb-card-lg p-6"
               >
                 <div className="flex flex-col md:flex-row items-center gap-8">
                   <IntegrityScore
@@ -190,7 +187,7 @@ export default function Results() {
                     riskLevel={session.riskLevel || "low"}
                   />
                   <div className="flex-1 w-full">
-                    <div className="grid grid-cols-2 gap-px bg-border border border-border">
+                    <div className="grid grid-cols-2 gap-3">
                       {summary.map((cat) => (
                         <CategorySummaryCard key={cat.id} {...cat} />
                       ))}
@@ -199,13 +196,12 @@ export default function Results() {
                 </div>
               </motion.div>
 
-              {/* Document viewer */}
+              {/* Document Viewer */}
               {session.fileData && (
                 <motion.div
-                  initial={{ opacity: 0, y: 8 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="border-b border-border"
                 >
                   <DocumentViewer
                     fileDataUrl={session.fileData}
@@ -216,7 +212,7 @@ export default function Results() {
 
               {/* AI Explanation */}
               <motion.div
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
               >
@@ -224,12 +220,12 @@ export default function Results() {
               </motion.div>
             </div>
 
-            {/* Right column — Findings */}
+            {/* Right column - Findings Panel */}
             <motion.div
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="bg-card"
+              className="space-y-6"
             >
               <FindingsPanel findings={findings} />
             </motion.div>

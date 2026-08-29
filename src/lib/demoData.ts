@@ -2,9 +2,12 @@
  * ProofChain Demo Data
  *
  * Contains sample documents for demonstration purposes.
+ * Generates real PDF invoices using pdf-lib.
  * All demo data is clearly labeled and should not be
  * misrepresented as real-world evidence.
  */
+
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 export interface DemoFile {
   id: string;
@@ -34,193 +37,197 @@ export const DEMO_FILES: DemoFile[] = [
 ];
 
 /**
- * Generate a canvas-based demo invoice image.
- * This creates a realistic-looking invoice that can be analyzed by the forensic engine.
+ * Generate a real PDF invoice document.
+ * The manipulated version changes the API Integration line from ₹8,500 to ₹18,500
+ * and adjusts the subtotal/total accordingly (creating an arithmetic inconsistency).
  */
-export function generateDemoInvoiceCanvas(manipulated: boolean): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
-  canvas.width = 600;
-  canvas.height = 800;
-  const ctx = canvas.getContext("2d")!;
+export async function generateDemoInvoicePdf(
+  manipulated: boolean
+): Promise<{ blob: Blob; dataUrl: string }> {
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  // Background
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, 600, 800);
+  const page = pdfDoc.addPage([612, 792]); // US Letter
+  const { width } = page.getSize();
 
-  // Header bar
-  ctx.fillStyle = "#1a1a2e";
-  ctx.fillRect(0, 0, 600, 80);
+  // Colors
+  const darkBlue = rgb(0.1, 0.1, 0.18);
+  const gray = rgb(0.4, 0.4, 0.4);
+  const lightGray = rgb(0.94, 0.94, 0.96);
+  const black = rgb(0.13, 0.13, 0.13);
+  const red = manipulated ? rgb(0.8, 0, 0) : black;
+
+  let y = 720;
+
+  // Header background
+  page.drawRectangle({
+    x: 40,
+    y: y - 55,
+    width: width - 80,
+    height: 65,
+    color: darkBlue,
+  });
 
   // Company name
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 22px Arial, sans-serif";
-  ctx.fillText("TECHNOVA SOLUTIONS", 40, 35);
+  page.drawText("TECHNOVA SOLUTIONS", {
+    x: 55,
+    y: y - 15,
+    size: 20,
+    font: boldFont,
+    color: rgb(1, 1, 1),
+  });
 
-  ctx.font = "11px Arial, sans-serif";
-  ctx.fillStyle = "#aaaacc";
-  ctx.fillText("Invoice & Billing System", 40, 55);
+  page.drawText("Invoice & Billing System", {
+    x: 55,
+    y: y - 35,
+    size: 9,
+    font,
+    color: rgb(0.67, 0.67, 0.8),
+  });
 
-  // Invoice title
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 14px Arial, sans-serif";
-  ctx.fillText("INVOICE", 480, 45);
-  ctx.font = "10px Arial, sans-serif";
-  ctx.fillStyle = "#88aacc";
-  ctx.fillText("INV-2024-0847", 460, 62);
+  // Invoice label
+  page.drawText("INVOICE", {
+    x: width - 130,
+    y: y - 12,
+    size: 14,
+    font: boldFont,
+    color: rgb(1, 1, 1),
+  });
 
-  // Invoice details section
-  ctx.fillStyle = "#f0f0f5";
-  ctx.fillRect(40, 100, 520, 70);
+  page.drawText("INV-2024-0847", {
+    x: width - 130,
+    y: y - 30,
+    size: 9,
+    font,
+    color: rgb(0.53, 0.67, 0.8),
+  });
 
-  ctx.fillStyle = "#333333";
-  ctx.font = "bold 11px Arial, sans-serif";
-  ctx.fillText("BILL TO:", 60, 125);
-  ctx.font = "11px Arial, sans-serif";
-  ctx.fillText("Acme Corp Ltd.", 60, 142);
-  ctx.fillText("42 Business Park, Mumbai 400001", 60, 158);
+  y -= 80;
 
-  ctx.font = "bold 11px Arial, sans-serif";
-  ctx.fillText("DATE:", 350, 125);
-  ctx.font = "11px Arial, sans-serif";
-  ctx.fillText("August 15, 2024", 350, 142);
+  // Bill To section
+  page.drawRectangle({
+    x: 40,
+    y: y - 65,
+    width: width - 80,
+    height: 65,
+    color: lightGray,
+  });
 
-  ctx.font = "bold 11px Arial, sans-serif";
-  ctx.fillText("DUE:", 350, 155);
-  ctx.font = "11px Arial, sans-serif";
-  ctx.fillText("September 14, 2024", 350, 170);
+  page.drawText("BILL TO:", { x: 55, y: y - 12, size: 9, font: boldFont, color: black });
+  page.drawText("Acme Corp Ltd.", { x: 55, y: y - 27, size: 10, font, color: black });
+  page.drawText("42 Business Park, Mumbai 400001", { x: 55, y: y - 42, size: 10, font, color: black });
 
-  // Line items header
-  ctx.fillStyle = "#1a1a2e";
-  ctx.fillRect(40, 200, 520, 30);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 11px Arial, sans-serif";
-  ctx.fillText("DESCRIPTION", 60, 220);
-  ctx.fillText("QTY", 340, 220);
-  ctx.fillText("RATE", 400, 220);
-  ctx.fillText("AMOUNT", 480, 220);
+  page.drawText("DATE:", { x: 350, y: y - 12, size: 9, font: boldFont, color: black });
+  page.drawText("August 15, 2024", { x: 350, y: y - 27, size: 10, font, color: black });
+
+  page.drawText("DUE:", { x: 350, y: y - 42, size: 9, font: boldFont, color: black });
+  page.drawText("September 14, 2024", { x: 350, y: y - 57, size: 10, font, color: black });
+
+  y -= 90;
+
+  // Table header
+  page.drawRectangle({
+    x: 40,
+    y: y - 25,
+    width: width - 80,
+    height: 25,
+    color: darkBlue,
+  });
+
+  page.drawText("DESCRIPTION", { x: 55, y: y - 17, size: 9, font: boldFont, color: rgb(1, 1, 1) });
+  page.drawText("QTY", { x: 340, y: y - 17, size: 9, font: boldFont, color: rgb(1, 1, 1) });
+  page.drawText("RATE", { x: 395, y: y - 17, size: 9, font: boldFont, color: rgb(1, 1, 1) });
+  page.drawText("AMOUNT", { x: 475, y: y - 17, size: 9, font: boldFont, color: rgb(1, 1, 1) });
+
+  y -= 35;
 
   // Line items
   const items = [
-    { desc: "Cloud Hosting (Annual)", qty: "1", rate: "₹45,000", amount: "₹45,000" },
-    { desc: "API Integration Services", qty: "1", rate: "₹18,500", amount: "₹18,500" },
-    { desc: "Technical Support Package", qty: "3", rate: "₹5,000", amount: "₹15,000" },
-    { desc: "Data Backup Service", qty: "12", rate: "₹1,000", amount: "₹12,000" },
+    { desc: "Cloud Hosting (Annual)", qty: "1", rate: "45,000", amount: "45,000", cleanAmount: "45,000" },
+    { desc: "API Integration Services", qty: "1", rate: manipulated ? "18,500" : "8,500", amount: manipulated ? "18,500" : "8,500", cleanAmount: "8,500" },
+    { desc: "Technical Support Package", qty: "3", rate: "5,000", amount: "15,000", cleanAmount: "15,000" },
+    { desc: "Data Backup Service", qty: "12", rate: "1,000", amount: "12,000", cleanAmount: "12,000" },
   ];
 
-  let y = 250;
   for (const item of items) {
-    ctx.fillStyle = y % 48 === 0 ? "#fafafa" : "#ffffff";
-    ctx.fillRect(40, y - 15, 520, 28);
+    const isModified = manipulated && item.desc === "API Integration Services";
+    const itemColor = isModified ? red : black;
+    const itemFont = isModified ? boldFont : font;
 
-    ctx.fillStyle = "#333333";
-    ctx.font = "11px Arial, sans-serif";
-    ctx.fillText(item.desc, 60, y);
-    ctx.fillText(item.qty, 345, y);
-    ctx.fillText(item.rate, 400, y);
+    page.drawText(item.desc, { x: 55, y, size: 10, font, color: black });
+    page.drawText(item.qty, { x: 345, y, size: 10, font, color: black });
+    page.drawText(item.rate, { x: 395, y, size: 10, font, color: black });
+    page.drawText(`₹${item.amount}`, { x: 470, y, size: 10, font: itemFont, color: itemColor });
 
-    // The manipulated line
-    if (manipulated && item.desc === "API Integration Services") {
-      // Draw manipulated amount with slightly different rendering
-      ctx.fillStyle = "#cc0000";
-      ctx.font = "bold 12px Arial, sans-serif";
-      ctx.fillText("₹18,500", 476, y);
-
-      // Subtle artifacts around the changed text
-      ctx.fillStyle = "rgba(200, 0, 0, 0.03)";
-      ctx.fillRect(470, y - 15, 80, 28);
-    } else {
-      ctx.fillStyle = "#333333";
-      ctx.font = "11px Arial, sans-serif";
-      ctx.fillText(item.amount, 480, y);
-    }
-
-    y += 28;
-  }
-
-  // Separator line
-  ctx.strokeStyle = "#1a1a2e";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(340, y + 5);
-  ctx.lineTo(560, y + 5);
-  ctx.stroke();
-
-  // Subtotal
-  y += 25;
-  ctx.fillStyle = "#555555";
-  ctx.font = "11px Arial, sans-serif";
-  ctx.fillText("Subtotal:", 400, y);
-  if (manipulated) {
-    ctx.fillStyle = "#cc0000";
-    ctx.font = "bold 12px Arial, sans-serif";
-    ctx.fillText("₹90,500", 480, y);
-  } else {
-    ctx.fillText("₹80,500", 480, y);
-  }
-
-  // Tax
-  y += 22;
-  ctx.fillStyle = "#555555";
-  ctx.font = "11px Arial, sans-serif";
-  ctx.fillText("GST (18%):", 400, y);
-  if (manipulated) {
-    ctx.fillText("₹16,290", 480, y);
-  } else {
-    ctx.fillText("₹14,490", 480, y);
+    y -= 25;
   }
 
   // Separator
-  ctx.strokeStyle = "#1a1a2e";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(340, y + 10);
-  ctx.lineTo(560, y + 10);
-  ctx.stroke();
+  page.drawLine({
+    start: { x: 340, y: y + 5 },
+    end: { x: width - 55, y: y + 5 },
+    thickness: 1.5,
+    color: darkBlue,
+  });
+
+  y -= 15;
+
+  // Subtotal — if manipulated, use wrong total (80,500→90,500 arithmetic error)
+  const subtotal = manipulated ? "90,500" : "80,500";
+  page.drawText("Subtotal:", { x: 385, y, size: 10, font, color: gray });
+  page.drawText(`₹${subtotal}`, { x: 470, y, size: 10, font: manipulated ? boldFont : font, color: manipulated ? red : black });
+
+  y -= 22;
+
+  // Tax
+  const tax = manipulated ? "16,290" : "14,490";
+  page.drawText("GST (18%):", { x: 385, y, size: 10, font, color: gray });
+  page.drawText(`₹${tax}`, { x: 470, y, size: 10, font, color: manipulated ? red : black });
+
+  y -= 15;
+
+  // Separator
+  page.drawLine({
+    start: { x: 340, y: y },
+    end: { x: width - 55, y: y },
+    thickness: 2,
+    color: darkBlue,
+  });
+
+  y -= 20;
 
   // Total
-  y += 32;
-  ctx.fillStyle = "#1a1a2e";
-  ctx.font = "bold 14px Arial, sans-serif";
-  ctx.fillText("TOTAL:", 400, y);
-  if (manipulated) {
-    ctx.fillStyle = "#cc0000";
-    ctx.font = "bold 16px Arial, sans-serif";
-    ctx.fillText("₹1,06,790", 460, y);
-
-    // Manipulation artifacts - slightly inconsistent background
-    ctx.fillStyle = "rgba(180, 0, 0, 0.02)";
-    ctx.fillRect(455, y - 20, 115, 35);
-  } else {
-    ctx.fillStyle = "#1a1a2e";
-    ctx.font = "bold 16px Arial, sans-serif";
-    ctx.fillText("₹94,990", 460, y);
-  }
+  const total = manipulated ? "1,06,790" : "94,990";
+  page.drawText("TOTAL:", { x: 385, y, size: 12, font: boldFont, color: darkBlue });
+  page.drawText(`₹${total}`, { x: 465, y, size: 14, font: boldFont, color: manipulated ? red : darkBlue });
 
   // Footer
-  ctx.fillStyle = "#f0f0f5";
-  ctx.fillRect(0, 700, 600, 100);
+  const footerY = 90;
+  page.drawRectangle({
+    x: 40,
+    y: footerY - 10,
+    width: width - 80,
+    height: 50,
+    color: lightGray,
+  });
 
-  ctx.fillStyle = "#888888";
-  ctx.font = "10px Arial, sans-serif";
-  ctx.fillText("Payment Terms: Net 30 days", 40, 725);
-  ctx.fillText("Bank: HDFC Bank | A/C: 50100234567890 | IFSC: HDFC0001234", 40, 745);
+  page.drawText("Payment Terms: Net 30 days", { x: 55, y: footerY + 20, size: 8, font, color: gray });
+  page.drawText("Bank: HDFC Bank | A/C: 50100234567890 | IFSC: HDFC0001234", { x: 55, y: footerY + 5, size: 8, font, color: gray });
+  page.drawText("Thank you for your business!", { x: 55, y: footerY - 10, size: 8, font, color: gray });
 
-  ctx.fillText("Thank you for your business!", 40, 770);
+  // Serialize
+  const pdfBytes = await pdfDoc.save();
 
-  // Add some compression artifacts for realism
-  if (manipulated) {
-    // Add subtle noise around the manipulated area
-    for (let i = 0; i < 50; i++) {
-      const rx = 460 + Math.random() * 80;
-      const ry = y - 50 + Math.random() * 80;
-      ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.03})`;
-      ctx.fillRect(rx, ry, 1, 1);
-    }
+  // Convert to data URL (avoid SharedArrayBuffer issues)
+  let binary = "";
+  for (let i = 0; i < pdfBytes.length; i++) {
+    binary += String.fromCharCode(pdfBytes[i]);
   }
+  const base64 = btoa(binary);
+  const dataUrl = `data:application/pdf;base64,${base64}`;
 
-  return canvas;
-}
+  const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" });
 
-export function canvasToDataUrl(canvas: HTMLCanvasElement): string {
-  return canvas.toDataURL("image/png");
+  return { blob, dataUrl };
 }

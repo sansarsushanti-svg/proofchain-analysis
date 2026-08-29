@@ -54,80 +54,11 @@ function computeBlockStats(
   return blocks;
 }
 
-function computeELA(
-  canvas: HTMLCanvasElement,
-  quality: number = 90
-): { mean: number; maxDiff: number; anomalyBlocks: { x: number; y: number; diff: number }[] } {
-  // Error Level Analysis: re-encode at a given quality and compare
-  const reencodedUrl = canvas.toDataURL("image/jpeg", quality / 100);
-  const width = canvas.width;
-  const height = canvas.height;
-
-  // Since we can't easily load the re-encoded image synchronously,
-  // we'll use a simplified approach: analyze compression inconsistencies
-  // by computing block-level statistics
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return { mean: 0, maxDiff: 0, anomalyBlocks: [] };
-
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const blocks = computeBlockStats(imageData.data, width, height, 16);
-
-  if (blocks.length === 0) return { mean: 0, maxDiff: 0, anomalyBlocks: [] };
-
-  // Compute global statistics
-  const allMeans = blocks.map(b => b.mean);
-  const allVariances = blocks.map(b => b.variance);
-  const globalMean = allMeans.reduce((a, b) => a + b, 0) / allMeans.length;
-  const globalVariance = allVariances.reduce((a, b) => a + b, 0) / allVariances.length;
-
-  // Compute block-to-block differences (gradient analysis)
-  const diffBlocks: { x: number; y: number; diff: number }[] = [];
-  let totalDiff = 0;
-  let maxDiff = 0;
-
-  for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i];
-
-    // Compare with neighboring blocks
-    let blockDiff = 0;
-    let neighbors = 0;
-
-    for (let j = 0; j < blocks.length; j++) {
-      if (i === j) continue;
-      const dist = Math.sqrt(
-        Math.pow(block.blockX - blocks[j].blockX, 2) +
-        Math.pow(block.blockY - blocks[j].blockY, 2)
-      );
-      if (dist <= 32) {
-        blockDiff += Math.abs(block.mean - blocks[j].mean);
-        neighbors++;
-      }
-    }
-
-    if (neighbors > 0) {
-      blockDiff /= neighbors;
-    }
-
-    totalDiff += blockDiff;
-    if (blockDiff > maxDiff) maxDiff = blockDiff;
-
-    // Flag blocks with high local variance (potential edit regions)
-    const varianceDeviation = block.variance / (globalVariance || 1);
-    const meanDeviation = Math.abs(block.mean - globalMean) / (globalMean || 1);
-
-    if (blockDiff > maxDiff * 0.6 || varianceDeviation > 2.5 || meanDeviation > 0.4) {
-      diffBlocks.push({
-        x: block.blockX,
-        y: block.blockY,
-        diff: blockDiff,
-      });
-    }
-  }
-
-  const mean = blocks.length > 0 ? totalDiff / blocks.length : 0;
-  return { mean, maxDiff, anomalyBlocks: diffBlocks };
-}
-
+/**
+ * Noise map analysis — format-neutral.
+ * Computes Laplacian-like noise estimate per block and flags outliers.
+ * Works for both JPEG and PNG.
+ */
 function computeNoiseMap(canvas: HTMLCanvasElement): { suspiciousRegions: { x: number; y: number; score: number }[] } {
   const ctx = canvas.getContext("2d");
   if (!ctx) return { suspiciousRegions: [] };
@@ -137,7 +68,6 @@ function computeNoiseMap(canvas: HTMLCanvasElement): { suspiciousRegions: { x: n
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
 
-  // Compute Laplacian-like noise estimate per block
   const blockSize = 32;
   const regions: { x: number; y: number; score: number }[] = [];
   const noiseValues: number[] = [];
@@ -152,7 +82,6 @@ function computeNoiseMap(canvas: HTMLCanvasElement): { suspiciousRegions: { x: n
           const idx = (y * width + x) * 4;
           const gray = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
 
-          // Laplacian kernel approximation
           const top = ((y - 1) * width + x) * 4;
           const bot = ((y + 1) * width + x) * 4;
           const left = (y * width + (x - 1)) * 4;
@@ -187,13 +116,75 @@ function computeNoiseMap(canvas: HTMLCanvasElement): { suspiciousRegions: { x: n
     noiseValues.reduce((sum, v) => sum + (v - meanNoise) ** 2, 0) / noiseValues.length
   );
 
-  // Flag regions with noise significantly different from the mean
   return {
     suspiciousRegions: regions.filter(r => Math.abs(r.score - meanNoise) > 2 * stdNoise && stdNoise > 0),
   };
 }
 
-function computeCompressionBlocks(canvas: HTMLCanvasElement): { suspiciousRegions: { x: number; y: number; score: number }[] } {
+/**
+ * Block-level gradient analysis — format-neutral.
+ * Compares each block's mean intensity with its neighbors.
+ * Flags blocks that deviate significantly from local neighborhood.
+ */
+function computeBlockGradientAnomalies(canvas: HTMLCanvasElement): { suspiciousRegions: { x: number; y: number; score: number }[] } {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return { suspiciousRegions: [] };
+
+  const width = canvas.width;
+  const height = canvas.height;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const blocks = computeBlockStats(imageData.data, width, height, 16);
+
+  if (blocks.length === 0) return { suspiciousRegions: [] };
+
+  const suspiciousRegions: { x: number; y: number; score: number }[] = [];
+
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+
+    // Compute mean difference with neighboring blocks (within 48px)
+    let blockDiff = 0;
+    let neighbors = 0;
+
+    for (let j = 0; j < blocks.length; j++) {
+      if (i === j) continue;
+      const dist = Math.sqrt(
+        Math.pow(block.blockX - blocks[j].blockX, 2) +
+        Math.pow(block.blockY - blocks[j].blockY, 2)
+      );
+      if (dist <= 48) {
+        blockDiff += Math.abs(block.mean - blocks[j].mean);
+        neighbors++;
+      }
+    }
+
+    if (neighbors > 0) blockDiff /= neighbors;
+
+    // Also check variance deviation
+    const globalVariance = blocks.reduce((sum, b) => sum + b.variance, 0) / blocks.length;
+    const varianceDeviation = block.variance / (globalVariance || 1);
+    const globalMean = blocks.reduce((sum, b) => sum + b.mean, 0) / blocks.length;
+    const meanDeviation = Math.abs(block.mean - globalMean) / (globalMean || 1);
+
+    // Flag blocks with high local gradient or high variance deviation
+    const threshold = 15; // Tuned for rendered document images
+    if (blockDiff > threshold || varianceDeviation > 3.0 || meanDeviation > 0.3) {
+      suspiciousRegions.push({
+        x: block.blockX,
+        y: block.blockY,
+        score: blockDiff + varianceDeviation * 5,
+      });
+    }
+  }
+
+  return { suspiciousRegions };
+}
+
+/**
+ * JPEG-specific compression block analysis.
+ * Only meaningful for JPEG images. NOT for PNG or rendered PDF.
+ */
+function computeJpegCompressionBlocks(canvas: HTMLCanvasElement): { suspiciousRegions: { x: number; y: number; score: number }[] } {
   const ctx = canvas.getContext("2d");
   if (!ctx) return { suspiciousRegions: [] };
 
@@ -202,7 +193,6 @@ function computeCompressionBlocks(canvas: HTMLCanvasElement): { suspiciousRegion
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
 
-  // Detect 8x8 block boundaries (JPEG compression artifact detection)
   const blockSize = 8;
   const blockEdgeDiffs: { x: number; y: number; score: number }[] = [];
 
@@ -210,7 +200,6 @@ function computeCompressionBlocks(canvas: HTMLCanvasElement): { suspiciousRegion
     for (let bx = 0; bx < width; bx += blockSize) {
       if (bx + blockSize >= width || by + blockSize >= height) continue;
 
-      // Check horizontal boundary
       let hDiff = 0;
       for (let x = bx; x < bx + blockSize; x++) {
         const topIdx = ((by + blockSize - 1) * width + x) * 4;
@@ -220,7 +209,6 @@ function computeCompressionBlocks(canvas: HTMLCanvasElement): { suspiciousRegion
           Math.abs(data[topIdx + 2] - data[botIdx + 2]);
       }
 
-      // Check vertical boundary
       let vDiff = 0;
       for (let y = by; y < by + blockSize; y++) {
         const leftIdx = (y * width + (bx + blockSize - 1)) * 4;
@@ -242,12 +230,73 @@ function computeCompressionBlocks(canvas: HTMLCanvasElement): { suspiciousRegion
     blockEdgeDiffs.reduce((sum, b) => sum + (b.score - meanDiff) ** 2, 0) / blockEdgeDiffs.length
   );
 
-  // Regions where block boundaries are inconsistent may indicate local manipulation
   return {
     suspiciousRegions: blockEdgeDiffs.filter(
       b => stdDiff > 0 && (b.score - meanDiff) > 1.5 * stdDiff
     ),
   };
+}
+
+/**
+ * Detect uniform regions that might indicate text overlay or fill.
+ * Format-neutral.
+ */
+function detectUniformRegions(
+  canvas: HTMLCanvasElement,
+  fileType: string
+): { suspiciousRegions: { x: number; y: number; score: number }[] } {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return { suspiciousRegions: [] };
+
+  const width = canvas.width;
+  const height = canvas.height;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  let uniformCount = 0;
+  let totalBlocks = 0;
+  const blockSize = 16;
+  const suspiciousRegions: { x: number; y: number; score: number }[] = [];
+
+  for (let by = 0; by < height; by += blockSize) {
+    for (let bx = 0; bx < width; bx += blockSize) {
+      if (bx + blockSize > width || by + blockSize > height) continue;
+      totalBlocks++;
+
+      let variance = 0;
+      let sum = 0;
+      for (let y = by; y < by + blockSize; y++) {
+        for (let x = bx; x < bx + blockSize; x++) {
+          const idx = (y * width + x) * 4;
+          const gray = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+          sum += gray;
+        }
+      }
+      const mean = sum / (blockSize * blockSize);
+      for (let y = by; y < by + blockSize; y++) {
+        for (let x = bx; x < bx + blockSize; x++) {
+          const idx = (y * width + x) * 4;
+          const gray = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+          variance += (gray - mean) ** 2;
+        }
+      }
+      variance /= blockSize * blockSize;
+      if (variance < 2) {
+        uniformCount++;
+        suspiciousRegions.push({ x: bx, y: by, score: 1 / (variance + 0.1) });
+      }
+    }
+  }
+
+  const uniformRatio = totalBlocks > 0 ? uniformCount / totalBlocks : 0;
+
+  // Only flag if an unusual proportion of the image is uniform
+  // (more relevant for JPEG where uniform fill after editing is suspicious)
+  if (uniformRatio > 0.5) {
+    return { suspiciousRegions: suspiciousRegions.slice(0, 10) }; // cap at 10
+  }
+
+  return { suspiciousRegions: [] };
 }
 
 export async function analyzeImageForensics(
@@ -256,8 +305,11 @@ export async function analyzeImageForensics(
 ): Promise<ForensicFinding[]> {
   const findings: ForensicFinding[] = [];
 
-  // Only analyze image files
-  if (!fileType.includes("image") && !fileType.includes("png") && !fileType.includes("jpeg") && !fileType.includes("jpg")) {
+  const isJpeg = fileType.includes("jpeg") || fileType.includes("jpg");
+  const isPng = fileType.includes("png");
+  const isImage = fileType.includes("image") || isJpeg || isPng;
+
+  if (!isImage) {
     return findings;
   }
 
@@ -266,7 +318,7 @@ export async function analyzeImageForensics(
     const width = canvas.width;
     const height = canvas.height;
 
-    // Check image dimensions for suspicious characteristics
+    // Check image dimensions
     if (width > 10000 || height > 10000) {
       findings.push({
         category: "image_forensics",
@@ -279,38 +331,17 @@ export async function analyzeImageForensics(
       });
     }
 
-    // ELA Analysis
-    const ela = computeELA(canvas);
-    if (ela.anomalyBlocks.length > 0) {
-      const percentage = (ela.anomalyBlocks.length / Math.max(1, (width / 16) * (height / 16))) * 100;
-      findings.push({
-        category: "image_forensics",
-        finding: "Compression inconsistency detected",
-        severity: percentage > 15 ? "high" : percentage > 5 ? "medium" : "low",
-        confidence: Math.min(95, 60 + percentage),
-        evidence: `Error level analysis found ${ela.anomalyBlocks.length} blocks (${percentage.toFixed(1)}% of image) with inconsistent compression levels.`,
-        technicalExplanation: `ELA analysis detected ${ela.anomalyBlocks.length} block regions with statistical compression anomalies. These regions may have been modified after initial compression, or they represent areas of different JPEG quality settings.`,
-        userExplanation: "Some areas of this image have different compression patterns than others, which can happen when parts of an image are edited or composited.",
-        region: ela.anomalyBlocks.length > 0 ? {
-          x: ela.anomalyBlocks[0].x,
-          y: ela.anomalyBlocks[0].y,
-          width: Math.min(64, width - ela.anomalyBlocks[0].x),
-          height: Math.min(64, height - ela.anomalyBlocks[0].y),
-        } : undefined,
-      });
-    }
-
-    // Noise analysis
+    // Noise analysis — works for all image formats
     const noise = computeNoiseMap(canvas);
     if (noise.suspiciousRegions.length > 0) {
       findings.push({
         category: "image_forensics",
-        finding: "Noise pattern inconsistency",
+        finding: "Noise pattern inconsistency detected",
         severity: noise.suspiciousRegions.length > 5 ? "medium" : "low",
         confidence: Math.min(85, 50 + noise.suspiciousRegions.length * 5),
-        evidence: `Found ${noise.suspiciousRegions.length} regions with noise patterns inconsistent with the overall image.`,
-        technicalExplanation: `Noise analysis detected ${noise.suspiciousRegions.length} regions where the local noise distribution differs significantly from the image average. Inconsistencies in noise patterns can indicate splicing or localized editing.`,
-        userExplanation: "Some areas of this image have a different graininess pattern than the rest, which can happen when different image sources are combined.",
+        evidence: `Found ${noise.suspiciousRegions.length} region(s) with noise patterns statistically different from the image average.`,
+        technicalExplanation: `Laplacian noise analysis detected ${noise.suspiciousRegions.length} region(s) where the local noise distribution differs significantly (>2σ) from the image mean. Inconsistencies in noise patterns can indicate splicing or localized editing.`,
+        userExplanation: "Some areas of this image have a different graininess pattern than the rest, which can happen when different image sources are combined or regions are edited.",
         region: noise.suspiciousRegions.length > 0 ? {
           x: noise.suspiciousRegions[0].x,
           y: noise.suspiciousRegions[0].y,
@@ -320,70 +351,57 @@ export async function analyzeImageForensics(
       });
     }
 
-    // Compression block analysis
-    const compression = computeCompressionBlocks(canvas);
-    if (compression.suspiciousRegions.length > 3) {
+    // Block gradient analysis — format-neutral
+    const gradient = computeBlockGradientAnomalies(canvas);
+    if (gradient.suspiciousRegions.length > 3) {
       findings.push({
         category: "image_forensics",
-        finding: "Block boundary anomalies detected",
-        severity: compression.suspiciousRegions.length > 10 ? "medium" : "low",
-        confidence: Math.min(80, 45 + compression.suspiciousRegions.length * 3),
-        evidence: `Found ${compression.suspiciousRegions.length} blocks with anomalous compression boundaries.`,
-        technicalExplanation: `Analysis of JPEG 8x8 block boundaries revealed ${compression.suspiciousRegions.length} regions where boundary artifacts are inconsistent. This pattern can indicate local re-compression after editing.`,
-        userExplanation: "Some parts of this image show unusual compression patterns at the block level, which can indicate selective editing.",
+        finding: "Block-level intensity anomalies detected",
+        severity: gradient.suspiciousRegions.length > 8 ? "medium" : "low",
+        confidence: Math.min(80, 45 + gradient.suspiciousRegions.length * 3),
+        evidence: `Found ${gradient.suspiciousRegions.length} blocks with anomalous intensity gradients compared to local neighborhoods.`,
+        technicalExplanation: `Block-level analysis detected ${gradient.suspiciousRegions.length} regions where the mean intensity deviates significantly from neighboring blocks. This can indicate localized editing where a region was modified independently of its surroundings.`,
+        userExplanation: "Some parts of this image show unusual brightness/color patterns compared to surrounding areas, which can indicate selective editing.",
+        region: gradient.suspiciousRegions.length > 0 ? {
+          x: gradient.suspiciousRegions[0].x,
+          y: gradient.suspiciousRegions[0].y,
+          width: Math.min(64, width - gradient.suspiciousRegions[0].x),
+          height: Math.min(64, height - gradient.suspiciousRegions[0].y),
+        } : undefined,
       });
     }
 
-    // Check for uniform regions that might indicate text overlay
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      const imageData = ctx.getImageData(0, 0, width, height);
-      const data = imageData.data;
-
-      // Check if there are large uniform regions (possible text area overlay)
-      let uniformCount = 0;
-      let totalBlocks = 0;
-      const blockSize = 16;
-
-      for (let by = 0; by < height; by += blockSize) {
-        for (let bx = 0; bx < width; bx += blockSize) {
-          if (bx + blockSize > width || by + blockSize > height) continue;
-          totalBlocks++;
-
-          let variance = 0;
-          let sum = 0;
-          for (let y = by; y < by + blockSize; y++) {
-            for (let x = bx; x < bx + blockSize; x++) {
-              const idx = (y * width + x) * 4;
-              const gray = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-              sum += gray;
-            }
-          }
-          const mean = sum / (blockSize * blockSize);
-          for (let y = by; y < by + blockSize; y++) {
-            for (let x = bx; x < bx + blockSize; x++) {
-              const idx = (y * width + x) * 4;
-              const gray = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-              variance += (gray - mean) ** 2;
-            }
-          }
-          variance /= blockSize * blockSize;
-          if (variance < 2) uniformCount++;
-        }
-      }
-
-      const uniformRatio = uniformCount / totalBlocks;
-      if (uniformRatio > 0.4 && fileType.includes("jpeg")) {
+    // JPEG-specific: compression block analysis
+    if (isJpeg) {
+      const compression = computeJpegCompressionBlocks(canvas);
+      if (compression.suspiciousRegions.length > 3) {
         findings.push({
           category: "image_forensics",
-          finding: "High proportion of uniform regions",
-          severity: "low",
-          confidence: 40,
-          evidence: `${(uniformRatio * 100).toFixed(1)}% of image blocks have near-uniform pixel values.`,
-          technicalExplanation: `${(uniformRatio * 100).toFixed(1)}% of the image blocks show very low variance (uniform pixel values). While this can be normal for certain image types, it may indicate areas where content was overlaid on uniform backgrounds.`,
-          userExplanation: "A significant portion of this image is very uniform in color, which can sometimes indicate text or elements were overlaid on plain backgrounds.",
+          finding: "JPEG compression block boundary anomalies detected",
+          severity: compression.suspiciousRegions.length > 10 ? "medium" : "low",
+          confidence: Math.min(80, 45 + compression.suspiciousRegions.length * 3),
+          evidence: `Found ${compression.suspiciousRegions.length} JPEG 8×8 blocks with anomalous compression boundaries.`,
+          technicalExplanation: `Analysis of JPEG 8×8 block boundaries revealed ${compression.suspiciousRegions.length} regions where boundary artifacts are inconsistent. This pattern can indicate local re-compression after editing.`,
+          userExplanation: "Some parts of this image show unusual compression patterns at the block level, which can indicate selective editing.",
         });
       }
+    } else {
+      // PNG / rendered PDF: skip JPEG-specific analysis, note format
+      // No misleading "compression inconsistency" finding for non-JPEG
+    }
+
+    // Uniform region detection — format-neutral
+    const uniform = detectUniformRegions(canvas, fileType);
+    if (uniform.suspiciousRegions.length > 0) {
+      findings.push({
+        category: "image_forensics",
+        finding: "High proportion of uniform regions detected",
+        severity: "low",
+        confidence: 40,
+        evidence: `${uniform.suspiciousRegions.length} block(s) with near-uniform pixel values detected.`,
+        technicalExplanation: `Several image blocks show very low variance in pixel values. While this can be normal for document backgrounds, an unusual concentration may indicate areas where content was overlaid on uniform fills.`,
+        userExplanation: "Some areas of this image are very uniform in color, which can sometimes indicate content was overlaid on plain backgrounds.",
+      });
     }
 
   } catch (error) {
@@ -393,7 +411,7 @@ export async function analyzeImageForensics(
       severity: "low",
       confidence: 100,
       evidence: `Image analysis failed: ${error instanceof Error ? error.message : "Unknown error"}.`,
-      technicalExplanation: `The image forensics module encountered an error during analysis: ${error instanceof Error ? error.message : "Unknown error"}. This does not affect other analysis modules.`,
+      technicalExplanation: `The image forensics module encountered an error: ${error instanceof Error ? error.message : "Unknown error"}. This does not affect other analysis modules.`,
       userExplanation: "Some image-level checks could not be completed. The file may be corrupted or in an unsupported format.",
     });
   }

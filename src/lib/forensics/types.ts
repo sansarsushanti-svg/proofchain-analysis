@@ -1,5 +1,5 @@
 export interface ForensicFinding {
-  category: "metadata" | "image_forensics" | "text_layout" | "pdf_structure";
+  category: "metadata" | "image_forensics" | "text_layout" | "pdf_structure" | "invoice_analysis" | "text_image_correlation";
   finding: string;
   severity: "low" | "medium" | "high";
   confidence: number; // 0-100
@@ -31,9 +31,11 @@ export interface AnalysisStage {
 export const ANALYSIS_STAGES: AnalysisStage[] = [
   { id: "received", label: "File received", status: "pending" },
   { id: "metadata", label: "Extracting metadata", status: "pending" },
+  { id: "render", label: "Rendering document", status: "pending" },
   { id: "structure", label: "Inspecting document structure", status: "pending" },
+  { id: "ocr", label: "Running optical character recognition", status: "pending" },
+  { id: "invoice", label: "Analyzing invoice values", status: "pending" },
   { id: "forensics", label: "Running image forensics", status: "pending" },
-  { id: "text", label: "Analyzing text and layout", status: "pending" },
   { id: "correlate", label: "Correlating evidence", status: "pending" },
   { id: "score", label: "Calculating integrity score", status: "pending" },
   { id: "explain", label: "Preparing explanation", status: "pending" },

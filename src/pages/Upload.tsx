@@ -11,8 +11,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import {
-  generateDemoInvoiceCanvas,
-  canvasToDataUrl,
+  generateDemoInvoicePdf,
   DEMO_FILES,
 } from "@/lib/demoData";
 
@@ -41,22 +40,26 @@ export default function Upload() {
   }, []);
 
   const handleLoadDemo = useCallback(async (manipulated: boolean) => {
-    const canvas = generateDemoInvoiceCanvas(manipulated);
-    const dataUrl = canvasToDataUrl(canvas);
-    const res = await fetch(dataUrl);
-    const blob = await res.blob();
-    const fileName = manipulated
-      ? DEMO_FILES[1].name
-      : DEMO_FILES[0].name;
-    const file = new File([blob], fileName, { type: "image/png" });
-    setSelectedFile({
-      file,
-      dataUrl,
-      name: fileName,
-      size: blob.size,
-      type: "image/png",
-    });
-    setError(null);
+    try {
+      const { blob, dataUrl } = await generateDemoInvoicePdf(manipulated);
+      const fileName = manipulated
+        ? DEMO_FILES[1].name
+        : DEMO_FILES[0].name;
+      setSelectedFile({
+        file: blob as File,
+        dataUrl,
+        name: fileName,
+        size: blob.size,
+        type: "application/pdf",
+      });
+      setError(null);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to generate demo PDF."
+      );
+    }
   }, []);
 
   const handleAnalyze = useCallback(async () => {

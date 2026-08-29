@@ -6,6 +6,8 @@ const CATEGORY_WEIGHTS: Record<string, number> = {
   image_forensics: 1.3,
   text_layout: 0.8,
   pdf_structure: 1.2,
+  invoice_analysis: 1.5,
+  text_image_correlation: 1.8,
 };
 
 // Severity weights
@@ -77,9 +79,11 @@ export function calculateIntegrityScore(
 export function getFindingsSummary(findings: ForensicFinding[]) {
   const categories = [
     { id: "metadata", label: "Metadata", icon: "file-text" },
-    { id: "image_forensics", label: "Image Forensics", icon: "scan" },
-    { id: "text_layout", label: "Text / Layout", icon: "type" },
     { id: "pdf_structure", label: "PDF Structure", icon: "file" },
+    { id: "invoice_analysis", label: "Invoice Analysis", icon: "calculator" },
+    { id: "image_forensics", label: "Image Forensics", icon: "scan" },
+    { id: "text_image_correlation", label: "Text / Image Correlation", icon: "link" },
+    { id: "text_layout", label: "Text / Layout", icon: "type" },
   ];
 
   return categories.map(cat => {

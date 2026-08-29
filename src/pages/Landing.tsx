@@ -148,7 +148,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Capabilities Section */}
       <section className="py-20 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
@@ -183,7 +183,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* How It Works Section */}
+      {/* Pipeline Section */}
       <section id="how-it-works" className="py-20 px-6 bg-muted border-y-2 border-border">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">

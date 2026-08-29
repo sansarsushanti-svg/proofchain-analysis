@@ -74,8 +74,6 @@ export default defineConfig({
   },
   // Optimize dependencies
   optimizeDeps: {
-    // Only scan the app entry HTML; avoids crawling unrelated *.html files
-    // if a legacy snapshot accidentally contains leaked package folders.
     entries: ['index.html'],
     include: [
       'react',
@@ -85,6 +83,8 @@ export default defineConfig({
       'react-router',
       '@convex-dev/auth/react',
       'framer-motion',
+      '@ai-sdk/openai-compatible',
+      'ai',
     ],
   },
   // Performance hints

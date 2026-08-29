@@ -1,10 +1,9 @@
 import "./index.css";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router";
-import { ConvexReactClient } from "convex/react";
-import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { InstrumentationProvider } from "./instrumentation";
 import { VlyToolbar } from "../vly-toolbar-readonly";
+import { AuthProvider } from "./contexts/AuthContext";
 
 import Landing from "@/pages/Landing";
 import AuthPage from "@/pages/Auth";
@@ -16,11 +15,9 @@ import History from "@/pages/History";
 import Reports from "@/pages/Reports";
 import { RequireAuth } from "@/components/RequireAuth";
 
-const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL!);
-
 createRoot(document.getElementById("root")!).render(
   <InstrumentationProvider>
-    <ConvexAuthProvider client={convex}>
+    <AuthProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -76,6 +73,6 @@ createRoot(document.getElementById("root")!).render(
         </Routes>
         <VlyToolbar />
       </BrowserRouter>
-    </ConvexAuthProvider>
-  </InstrumentationProvider>
+    </AuthProvider>
+  </InstrumentationProvider>,
 );

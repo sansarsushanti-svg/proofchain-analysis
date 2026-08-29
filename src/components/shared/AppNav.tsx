@@ -75,7 +75,7 @@ export function AppNav() {
               Signed in as
             </p>
             <p className="text-sm font-semibold truncate mt-1">
-              {user?.name || user?.email || "User"}
+              {user?.email || "User"}
             </p>
           </div>
           <button

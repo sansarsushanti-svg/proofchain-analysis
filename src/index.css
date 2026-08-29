@@ -78,7 +78,7 @@
   --sidebar-ring: oklch(0.7 0.14 150);
 }
 
-.dark, .light {
+.light {
   --background: oklch(0.98 0 0);
   --foreground: oklch(0.1 0 0);
   --card: oklch(1 0 0);

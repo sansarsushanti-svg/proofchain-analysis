@@ -8,6 +8,8 @@ import { runForensicAnalysis } from "@/lib/forensics/engine";
 import { generateAiExplanation } from "@/lib/ai";
 import { motion } from "framer-motion";
 
+const LOG = "[ProofChain]";
+
 /** Safety timeout: if analysis takes longer than this, show an error. */
 const SAFETY_TIMEOUT_MS = 120_000; // 2 minutes
 
@@ -23,16 +25,11 @@ export default function Analysis() {
 
   const handleStageUpdate = useCallback(
     (stageId: string, status: "analyzing" | "completed") => {
-      setStages((prev) => {
-        const newStages = prev.map((s) => {
-          if (s.id === stageId) return { ...s, status };
-          return s;
-        });
-        return newStages;
-      });
+      setStages((prev) =>
+        prev.map((s) => (s.id === stageId ? { ...s, status } : s)),
+      );
 
       setCurrentStageIndex((prev) => {
-        // Use ANALYSIS_STAGES (static) to avoid stale closure
         const idx = ANALYSIS_STAGES.findIndex((s) => s.id === stageId);
         if (status === "completed") return Math.max(prev, idx + 1);
         return Math.max(prev, idx);
@@ -48,16 +45,25 @@ export default function Analysis() {
     let safetyTimer: ReturnType<typeof setTimeout> | null = null;
 
     const runAnalysis = async () => {
+      console.log(`${LOG} Loading session ${sessionId}...`);
       const session = await getSession(sessionId);
-      if (!session || session.status !== "pending") return;
+      if (!session) {
+        console.error(`${LOG} Session not found: ${sessionId}`);
+        setError("Session not found. Please start a new analysis.");
+        return;
+      }
+      if (session.status !== "pending") {
+        console.log(`${LOG} Session already ${session.status}, skipping`);
+        return;
+      }
       if (cancelled) return;
 
       analysisStarted.current = true;
 
-      // Safety timeout: if analysis takes too long, show error
+      // Safety timeout
       safetyTimer = setTimeout(() => {
         if (!cancelled) {
-          console.error("[ProofChain] Safety timeout reached");
+          console.error(`${LOG} Safety timeout reached`);
           setError("Analysis timed out. The document may be too large or a required service is unavailable. Please try again.");
           setIsRunning(false);
         }
@@ -65,8 +71,11 @@ export default function Analysis() {
 
       try {
         setIsRunning(true);
+        console.log(`${LOG} Setting session status to analyzing...`);
         await updateSession(sessionId, { status: "analyzing" });
+        console.log(`${LOG} Session status updated to analyzing`);
 
+        console.log(`${LOG} Starting forensic analysis...`);
         const result = await runForensicAnalysis(
           {
             name: session.fileName,
@@ -77,50 +86,76 @@ export default function Analysis() {
           { onStageUpdate: handleStageUpdate },
         );
 
-        if (cancelled) return;
+        console.log(`${LOG} Engine resolved. Score: ${result.integrityScore}, Findings: ${result.findings.length}`);
 
-        if (result.findings.length > 0) {
-          await bulkInsertFindings(
-            sessionId,
-            result.findings.map((f) => ({
-              category: f.category,
-              finding: f.finding,
-              severity: f.severity,
-              confidence: f.confidence,
-              evidence: f.evidence,
-              technicalExplanation: f.technicalExplanation,
-              userExplanation: f.userExplanation,
-              region: f.region,
-            })),
-          );
+        if (cancelled) {
+          console.log(`${LOG} Cancelled after engine resolve, not saving`);
+          return;
         }
 
+        // Save findings
+        console.log(`${LOG} Saving ${result.findings.length} finding(s)...`);
+        try {
+          if (result.findings.length > 0) {
+            await bulkInsertFindings(
+              sessionId,
+              result.findings.map((f) => ({
+                category: f.category,
+                finding: f.finding,
+                severity: f.severity,
+                confidence: f.confidence,
+                evidence: f.evidence,
+                technicalExplanation: f.technicalExplanation,
+                userExplanation: f.userExplanation,
+                region: f.region,
+              })),
+            );
+          }
+          console.log(`${LOG} Findings saved successfully`);
+        } catch (findingsErr) {
+          console.error(`${LOG} Failed to save findings:`, findingsErr);
+          // Non-fatal: continue to update session and navigate
+        }
+
+        if (cancelled) return;
+
+        // Generate AI explanation
         let aiExplanation = "";
         try {
           const explanation = generateAiExplanation(result);
           aiExplanation = JSON.stringify(explanation);
-        } catch {
-          // continue without AI
+          console.log(`${LOG} AI explanation generated`);
+        } catch (aiErr) {
+          console.error(`${LOG} AI explanation failed:`, aiErr);
+        }
+
+        // Update session with results
+        console.log(`${LOG} Updating session with results...`);
+        try {
+          await updateSession(sessionId, {
+            status: "completed",
+            integrityScore: result.integrityScore,
+            riskLevel: result.riskLevel,
+            aiExplanation,
+          });
+          console.log(`${LOG} Session updated to completed`);
+        } catch (sessionErr) {
+          console.error(`${LOG} Failed to update session:`, sessionErr);
+          // Non-fatal: try to navigate anyway
         }
 
         if (cancelled) return;
 
-        await updateSession(sessionId, {
-          status: "completed",
-          integrityScore: result.integrityScore,
-          riskLevel: result.riskLevel,
-          aiExplanation,
-        });
-
-        navigate(`/results/${sessionId}`);
+        // Navigate to results
+        const resultsUrl = `/results/${sessionId}`;
+        console.log(`${LOG} Navigating to ${resultsUrl}`);
+        navigate(resultsUrl);
+        console.log(`${LOG} Navigation called`);
       } catch (err) {
-        console.error("[ProofChain] Analysis failed:", err);
+        console.error(`${LOG} Analysis pipeline failed:`, err);
         if (cancelled) return;
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Analysis failed. Please try again.",
-        );
+        const msg = err instanceof Error ? err.message : "Analysis failed. Please try again.";
+        setError(msg);
         try {
           await updateSession(sessionId, { status: "failed" });
         } catch {}

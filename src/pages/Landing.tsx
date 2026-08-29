@@ -1,78 +1,62 @@
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
-import {
-  Shield,
-  Scan,
-  Layers,
-  FileSearch,
-  AlertTriangle,
-  BarChart3,
-  ArrowRight,
-  ChevronRight,
-} from "lucide-react";
 
 const CAPABILITIES = [
   {
-    icon: Scan,
+    num: "01",
     title: "Multi-Module Forensic Pipeline",
-    description: "Runs metadata extraction, image forensics, text analysis, and document structure inspection in parallel. Each module is independent and replaceable.",
+    description:
+      "Metadata extraction, image forensics, text analysis, and document structure inspection — each module independent and replaceable.",
   },
   {
-    icon: BarChart3,
+    num: "02",
     title: "Weighted Evidence Scoring",
-    description: "Integrity scores are computed from categorized findings with configurable severity and confidence weights. No opaque ML predictions.",
+    description:
+      "Integrity scores computed from categorized findings with configurable severity and confidence weights. No opaque ML predictions.",
   },
   {
-    icon: Layers,
+    num: "03",
     title: "Region-Level Localization",
-    description: "Identifies and overlays bounding boxes on statistically anomalous regions within documents and images.",
+    description:
+      "Identifies and overlays annotation boxes on statistically anomalous regions within documents and images.",
   },
   {
-    icon: FileSearch,
+    num: "04",
     title: "Structured Findings",
-    description: "Every finding includes category, severity, confidence, raw evidence, a technical explanation, and a user-facing summary.",
+    description:
+      "Every finding includes category, severity, confidence, raw evidence, a technical explanation, and a user-facing summary.",
   },
 ];
 
 const PIPELINE = [
-  { num: "01", title: "Ingest", desc: "Accept PDF, JPG, or PNG with type and size validation" },
+  { num: "01", title: "Ingest", desc: "PDF, JPG, or PNG with type and size validation" },
   { num: "02", title: "Extract", desc: "Metadata, EXIF, structural properties" },
-  { num: "03", title: "Inspect", desc: "Image forensics, compression analysis, text layout" },
-  { num: "04", title: "Correlate", desc: "Aggregate findings into a single integrity score" },
-  { num: "05", title: "Report", desc: "Explain evidence and export a forensic report" },
+  { num: "03", title: "Inspect", desc: "Image forensics, compression, text layout" },
+  { num: "04", title: "Correlate", desc: "Aggregate findings into integrity score" },
+  { num: "05", title: "Report", desc: "Explain evidence, export forensic report" },
 ];
 
 export default function Landing() {
   const navigate = useNavigate();
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
-      className="min-h-screen bg-background"
-    >
+    <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-sm border-b-2 border-border">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-foreground flex items-center justify-center">
-              <Shield className="w-5 h-5 text-background" />
-            </div>
-            <span className="text-xl font-black tracking-tight uppercase">
-              Proof<span className="text-accent">Chain</span>
-            </span>
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="font-display text-xl tracking-tight">ProofChain</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <button
               onClick={() => navigate("/auth")}
-              className="px-4 py-2 text-sm font-bold uppercase tracking-wider border-2 border-border hover:bg-muted transition-colors"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
               Sign In
             </button>
             <button
               onClick={() => navigate("/auth")}
-              className="nb-btn-primary px-4 py-2 text-sm bg-foreground text-background"
+              className="nb-btn-primary px-5 py-2 bg-foreground text-background"
             >
               Get Started
             </button>
@@ -80,181 +64,169 @@ export default function Landing() {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          {/* Main heading */}
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mt-8 text-6xl sm:text-7xl md:text-8xl font-black uppercase tracking-tighter leading-[0.9]"
-          >
-            Proof
-            <span className="text-accent">Chain</span>
-          </motion.h1>
-
-          {/* Subheadline */}
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed"
-          >
-            Digital document integrity analysis. Detect tampering indicators,
-            localize suspicious regions, and generate evidence-backed reports.
-          </motion.p>
-
-          {/* CTAs */}
+      {/* Hero */}
+      <section className="pt-32 pb-16 px-6">
+        <div className="max-w-4xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
+            transition={{ duration: 0.5 }}
           >
-            <button
-              onClick={() => navigate("/auth")}
-              className="nb-btn-primary px-8 py-4 text-base bg-foreground text-background w-full sm:w-auto"
-            >
-              Sign In
-              <ArrowRight className="w-5 h-5 ml-2 inline" />
-            </button>
-            <a
-              href="#how-it-works"
-              className="nb-btn-outline px-8 py-4 text-base w-full sm:w-center text-center"
-            >
-              How It Works
-            </a>
+            {/* Editorial label */}
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-8 h-[1.5px] bg-accent" />
+              <span className="editorial-label">Digital Forensics Platform</span>
+            </div>
+
+            {/* Main heading */}
+            <h1 className="font-display text-5xl sm:text-6xl md:text-7xl leading-[0.95] tracking-tight mb-6">
+              ProofChain
+            </h1>
+
+            {/* Subheadline */}
+            <p className="text-lg sm:text-xl text-muted-foreground max-w-xl leading-relaxed mb-4">
+              Know what happened to your file.
+            </p>
+            <p className="text-sm text-muted-foreground/70 max-w-lg leading-relaxed mb-10">
+              Evidence-backed digital integrity analysis for documents and images.
+            </p>
+
+            {/* CTAs */}
+            <div className="flex flex-col sm:flex-row items-start gap-3">
+              <button
+                onClick={() => navigate("/auth")}
+                className="nb-btn-primary px-7 py-3 bg-foreground text-background"
+              >
+                Analyze a Document →
+              </button>
+              <a
+                href="#how-it-works"
+                className="nb-btn-outline px-7 py-3 bg-background text-foreground"
+              >
+                See How It Works
+              </a>
+            </div>
+          </motion.div>
+
+          {/* Forensic visual detail — document outline */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6, duration: 0.8 }}
+            className="mt-16 border border-border bg-card p-8 max-w-md"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="editorial-label">file</span>
+                <span className="text-sm font-medium">invoice_march_2024.pdf</span>
+              </div>
+              <div className="h-[1px] bg-border" />
+              <div className="grid grid-cols-3 gap-4 text-xs">
+                <div>
+                  <span className="editorial-label block mb-1">type</span>
+                  <span className="font-medium">PDF 1.7</span>
+                </div>
+                <div>
+                  <span className="editorial-label block mb-1">pages</span>
+                  <span className="font-medium">1</span>
+                </div>
+                <div>
+                  <span className="editorial-label block mb-1">size</span>
+                  <span className="font-medium">247 KB</span>
+                </div>
+              </div>
+              <div className="h-[1px] bg-border" />
+              <div className="flex items-center gap-2">
+                <span className="editorial-label">integrity</span>
+                <span className="text-sm font-bold text-accent">31 / 100</span>
+                <span className="nb-badge px-2 py-0.5 bg-accent/10 text-accent">HIGH RISK</span>
+              </div>
+            </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Technical specs bar */}
-      <section className="border-y-2 border-border">
-        <div className="max-w-6xl mx-auto px-6 py-6 grid grid-cols-2 sm:grid-cols-4 gap-6">
-          {[
-            { label: "Modules", value: "4" },
-            { label: "Finding Types", value: "12+" },
-            { label: "Evidence Signals", value: "50+" },
-            { label: "Analysis", value: "<30s" },
-          ].map((stat) => (
-            <div key={stat.label} className="text-center">
-              <p className="text-2xl sm:text-3xl font-black">{stat.value}</p>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-1">
-                {stat.label}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Capabilities Section */}
-      <section className="py-20 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <span className="nb-badge px-3 py-1 bg-muted">CAPABILITIES</span>
-            <h2 className="mt-4 text-3xl sm:text-4xl font-black uppercase tracking-tight">
-              How It Analyzes
+      {/* Capabilities */}
+      <section className="py-16 px-6 border-t border-border">
+        <div className="max-w-5xl mx-auto">
+          <div className="mb-10">
+            <span className="editorial-label">Capabilities</span>
+            <h2 className="font-display text-2xl sm:text-3xl mt-2">
+              How it analyzes
             </h2>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            {CAPABILITIES.map((cap, idx) => (
-              <motion.div
-                key={cap.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                className="nb-card p-6"
-              >
-                <div className="w-12 h-12 bg-foreground text-background flex items-center justify-center mb-4">
-                  <cap.icon className="w-6 h-6" />
-                </div>
-                <h3 className="font-black uppercase tracking-wider text-sm mb-2">
+          <div className="grid sm:grid-cols-2 gap-px bg-border border border-border">
+            {CAPABILITIES.map((cap) => (
+              <div key={cap.num} className="bg-card p-6">
+                <span className="evidence-num text-2xl">{cap.num}</span>
+                <h3 className="text-sm font-bold uppercase tracking-wide mt-3 mb-2">
                   {cap.title}
                 </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {cap.description}
                 </p>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pipeline Section */}
-      <section id="how-it-works" className="py-20 px-6 bg-muted border-y-2 border-border">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <span className="nb-badge px-3 py-1 bg-background border-border">PIPELINE</span>
-            <h2 className="mt-4 text-3xl sm:text-4xl font-black uppercase tracking-tight">
-              Analysis Pipeline
+      {/* Pipeline */}
+      <section id="how-it-works" className="py-16 px-6 bg-secondary/50 border-y border-border">
+        <div className="max-w-5xl mx-auto">
+          <div className="mb-10">
+            <span className="editorial-label">Pipeline</span>
+            <h2 className="font-display text-2xl sm:text-3xl mt-2">
+              Analysis pipeline
             </h2>
           </div>
 
-          <div className="grid sm:grid-cols-5 gap-4">
-            {PIPELINE.map((step, idx) => (
-              <motion.div
-                key={step.num}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                className="nb-card p-6 text-center"
-              >
-                <span className="text-4xl font-black text-muted-foreground/30">
-                  {step.num}
-                </span>
-                <h3 className="font-black uppercase tracking-wider text-base mt-3 mb-2">
+          <div className="grid grid-cols-5 gap-px bg-border border border-border">
+            {PIPELINE.map((step) => (
+              <div key={step.num} className="bg-card p-5 text-center">
+                <span className="evidence-num text-lg">{step.num}</span>
+                <h3 className="text-xs font-bold uppercase tracking-wider mt-2 mb-1">
                   {step.title}
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground leading-relaxed">
                   {step.desc}
                 </p>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* CTA */}
       <section className="py-20 px-6">
         <div className="max-w-3xl mx-auto text-center">
-          <div className="nb-card-lg p-12">
-            <div className="w-16 h-16 bg-foreground flex items-center justify-center mx-auto mb-6">
-              <AlertTriangle className="w-8 h-8 text-background" />
-            </div>
-            <h2 className="text-3xl font-black uppercase tracking-tight mb-4">
-              Evidence Over Guesswork
-            </h2>
-            <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
-              ProofChain does not label files as fake. It surfaces anomalies,
-              provides the evidence, and lets you assess the findings.
-            </p>
-            <button
-              onClick={() => navigate("/auth")}
-              className="nb-btn-primary px-8 py-4 text-base bg-foreground text-background"
-            >
-              Sign In
-              <ChevronRight className="w-5 h-5 ml-2 inline" />
-            </button>
-          </div>
+          <span className="editorial-label">Evidence over guesswork</span>
+          <h2 className="font-display text-3xl sm:text-4xl mt-4 mb-4">
+            Built for people who need<br />to know, not guess
+          </h2>
+          <p className="text-sm text-muted-foreground mb-8 max-w-md mx-auto">
+            ProofChain does not label files as fake. It surfaces anomalies,
+            provides the evidence, and lets you assess the findings.
+          </p>
+          <button
+            onClick={() => navigate("/auth")}
+            className="nb-btn-primary px-8 py-3 bg-foreground text-background"
+          >
+            Analyze a Document →
+          </button>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t-2 border-border py-8 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4" />
-            <span className="text-sm font-black uppercase">ProofChain</span>
-          </div>
+      <footer className="border-t border-border py-6 px-6">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <span className="font-display text-sm">ProofChain</span>
           <p className="text-xs text-muted-foreground">
-            Internal tool — digital document integrity analysis.
+            Internal tool — digital document integrity analysis
           </p>
         </div>
       </footer>
-    </motion.div>
+    </div>
   );
 }

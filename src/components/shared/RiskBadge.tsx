@@ -7,16 +7,16 @@ interface RiskBadgeProps {
 
 export function RiskBadge({ level, size = "md" }: RiskBadgeProps) {
   const styles: Record<string, string> = {
-    low: "bg-emerald-100 text-emerald-800 border-emerald-500",
-    moderate: "bg-amber-100 text-amber-800 border-amber-500",
-    high: "bg-red-100 text-red-800 border-red-500",
-    critical: "bg-red-200 text-red-900 border-red-700",
+    low: "bg-secondary text-foreground/70 border-border",
+    moderate: "bg-amber-50 text-amber-800 border-amber-300",
+    high: "bg-accent/10 text-accent border-accent/30",
+    critical: "bg-accent/15 text-accent border-accent/40",
   };
 
   const sizeStyles: Record<string, string> = {
     sm: "text-[10px] px-2 py-0.5",
-    md: "text-xs px-3 py-1",
-    lg: "text-sm px-4 py-1.5",
+    md: "text-[10px] px-2.5 py-0.5",
+    lg: "text-xs px-3 py-1",
   };
 
   const labels: Record<string, string> = {
@@ -29,7 +29,7 @@ export function RiskBadge({ level, size = "md" }: RiskBadgeProps) {
   return (
     <span
       className={cn(
-        "nb-badge inline-flex items-center font-black",
+        "nb-badge inline-flex items-center",
         styles[level],
         sizeStyles[size]
       )}

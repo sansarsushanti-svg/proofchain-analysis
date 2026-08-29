@@ -29,7 +29,6 @@ export function FileUpload({ onFileSelected, disabled = false }: FileUploadProps
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = useCallback((file: File): string | null => {
-    // Check file type
     const isValidType = Object.keys(ACCEPTED_TYPES).includes(file.type) ||
       file.name.endsWith(".pdf") ||
       file.name.endsWith(".jpg") ||
@@ -37,10 +36,9 @@ export function FileUpload({ onFileSelected, disabled = false }: FileUploadProps
       file.name.endsWith(".png");
 
     if (!isValidType) {
-      return `Unsupported file type. Please upload PDF, JPG, or PNG files.`;
+      return "Unsupported file type. Please upload PDF, JPG, or PNG files.";
     }
 
-    // Check file size
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
       return `File is too large. Maximum size is ${MAX_SIZE_MB}MB.`;
     }
@@ -59,17 +57,9 @@ export function FileUpload({ onFileSelected, disabled = false }: FileUploadProps
     const reader = new FileReader();
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string;
-      onFileSelected({
-        file,
-        dataUrl,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      });
+      onFileSelected({ file, dataUrl, name: file.name, size: file.size, type: file.type });
     };
-    reader.onerror = () => {
-      setError("Failed to read file. Please try again.");
-    };
+    reader.onerror = () => setError("Failed to read file. Please try again.");
     reader.readAsDataURL(file);
   }, [validateFile, onFileSelected]);
 
@@ -77,11 +67,8 @@ export function FileUpload({ onFileSelected, disabled = false }: FileUploadProps
     e.preventDefault();
     setIsDragging(false);
     if (disabled) return;
-
     const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      handleFile(files[0]);
-    }
+    if (files.length > 0) handleFile(files[0]);
   }, [handleFile, disabled]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -96,9 +83,7 @@ export function FileUpload({ onFileSelected, disabled = false }: FileUploadProps
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0) {
-      handleFile(files[0]);
-    }
+    if (files && files.length > 0) handleFile(files[0]);
   }, [handleFile]);
 
   return (
@@ -109,44 +94,42 @@ export function FileUpload({ onFileSelected, disabled = false }: FileUploadProps
         onDragLeave={handleDragLeave}
         onClick={() => !disabled && inputRef.current?.click()}
         className={cn(
-          "relative border-3 border-dashed transition-all cursor-pointer",
-          "flex flex-col items-center justify-center py-16 px-8 text-center",
+          "relative border-2 border-dashed transition-all cursor-pointer",
+          "flex flex-col items-center justify-center py-14 px-8 text-center",
           isDragging
-            ? "border-foreground bg-muted/50"
-            : "border-border bg-card hover:border-foreground/50 hover:bg-muted/30",
+            ? "border-foreground bg-secondary/40"
+            : "border-border bg-card hover:border-foreground/30 hover:bg-secondary/20",
           disabled && "opacity-50 cursor-not-allowed"
         )}
       >
-        <div
+        <Upload
           className={cn(
-            "w-16 h-16 flex items-center justify-center mb-4 border-3",
-            isDragging ? "bg-foreground text-background" : "bg-muted text-foreground border-border"
+            "w-6 h-6 mb-4",
+            isDragging ? "text-foreground" : "text-muted-foreground"
           )}
-        >
-          <Upload className="w-7 h-7" />
-        </div>
+        />
 
-        <p className="text-lg font-bold uppercase tracking-wider mb-2">
-          {isDragging ? "Drop your file here" : "Upload a file for analysis"}
+        <p className="text-sm font-medium uppercase tracking-wider mb-1">
+          {isDragging ? "Drop your file here" : "Drop document here"}
         </p>
 
-        <p className="text-sm text-muted-foreground mb-4">
-          Drag and drop or click to browse
+        <p className="text-xs text-muted-foreground mb-4">
+          or click to browse
         </p>
 
-        <div className="flex gap-2 flex-wrap justify-center">
+        <div className="flex gap-2">
           {["PDF", "JPG", "PNG"].map((type) => (
             <span
               key={type}
-              className="nb-badge px-3 py-1 bg-muted text-muted-foreground"
+              className="nb-badge px-2 py-0.5 bg-secondary text-muted-foreground border-border"
             >
               {type}
             </span>
           ))}
         </div>
 
-        <p className="text-xs text-muted-foreground mt-4">
-          Maximum file size: {MAX_SIZE_MB}MB
+        <p className="text-[10px] font-mono text-muted-foreground/60 mt-3">
+          Max {MAX_SIZE_MB}MB
         </p>
 
         <input
@@ -160,12 +143,9 @@ export function FileUpload({ onFileSelected, disabled = false }: FileUploadProps
       </div>
 
       {error && (
-        <div className="mt-4 p-4 border-2 border-red-300 bg-red-50 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold text-sm text-red-700 uppercase">Upload Error</p>
-            <p className="text-sm text-red-600 mt-1">{error}</p>
-          </div>
+        <div className="mt-3 p-3 border border-destructive/30 bg-destructive/5 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+          <p className="text-xs text-destructive">{error}</p>
         </div>
       )}
     </div>
@@ -188,10 +168,9 @@ export function FilePreview({ file, onRemove }: FilePreviewProps) {
   const isPdf = file.type.includes("pdf");
 
   return (
-    <div className="border-3 border-border bg-card p-4">
-      <div className="flex items-start gap-4">
-        {/* File icon / thumbnail */}
-        <div className="w-16 h-16 border-2 border-border bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+    <div className="border border-border bg-card p-4">
+      <div className="flex items-center gap-4">
+        <div className="w-14 h-14 border border-border bg-secondary/30 flex items-center justify-center shrink-0 overflow-hidden">
           {isImage ? (
             <img
               src={file.dataUrl}
@@ -199,28 +178,30 @@ export function FilePreview({ file, onRemove }: FilePreviewProps) {
               className="w-full h-full object-cover"
             />
           ) : isPdf ? (
-            <FileText className="w-7 h-7 text-foreground" />
+            <FileText className="w-5 h-5 text-muted-foreground" />
           ) : (
-            <Image className="w-7 h-7 text-foreground" />
+            <Image className="w-5 h-5 text-muted-foreground" />
           )}
         </div>
 
-        {/* File info */}
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm truncate">{file.name}</p>
-          <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+          <p className="text-sm font-medium truncate">{file.name}</p>
+          <div className="flex gap-2 mt-0.5 text-[10px] text-muted-foreground font-mono">
             <span>{formatSize(file.size)}</span>
-            <span className="uppercase font-semibold">{file.type.split("/")[1]}</span>
+            <span>·</span>
+            <span className="uppercase">{file.type.split("/")[1]}</span>
           </div>
         </div>
 
-        {/* Remove button */}
         <button
-          onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          className="p-2 border-2 border-border hover:border-red-300 hover:bg-red-50 transition-colors shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="p-1.5 border border-border hover:bg-destructive/10 hover:border-destructive/30 transition-colors shrink-0"
           title="Remove file"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>

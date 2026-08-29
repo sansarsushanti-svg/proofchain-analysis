@@ -70,7 +70,6 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
           setIsLoading(false);
           return;
         }
-        // Sign up successful - redirect to dashboard
         navigate(redirect);
       } else {
         const { error } = await signIn(email, password);
@@ -83,7 +82,6 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
           setIsLoading(false);
           return;
         }
-        // Sign in successful - redirect to dashboard
         navigate(redirect);
       }
     } catch (err) {
@@ -104,129 +102,114 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Auth Content */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="flex items-center justify-center h-full flex-col">
-          <Card className="min-w-[350px] pb-0 border-2 border-border shadow-[4px_4px_0px_0px] shadow-foreground/10">
-            <CardHeader className="text-center">
-              <div className="flex justify-center">
-                <img
-                  src={logo}
-                  alt="ProofChain Logo"
-                  width={64}
-                  height={64}
-                  className="rounded-lg mb-4 mt-4 cursor-pointer"
-                  onClick={() => navigate("/")}
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Top bar */}
+      <nav className="border-b border-border px-6 py-4">
+        <span className="font-display text-lg tracking-tight">ProofChain</span>
+      </nav>
+
+      <div className="flex-1 flex items-center justify-center px-6">
+        <div className="w-full max-w-[380px]">
+          <div className="mb-8">
+            <span className="editorial-label">Authentication</span>
+            <h1 className="font-display text-2xl mt-2">
+              {mode === "signin" ? "Sign in to your account" : "Create a new account"}
+            </h1>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="editorial-label">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="name@example.com"
+                  className="nb-input pl-9 h-10"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isLoading}
+                  required
                 />
               </div>
-              <CardTitle className="text-xl font-black uppercase tracking-tight">
-                ProofChain
-              </CardTitle>
-              <CardDescription>
-                {mode === "signin"
-                  ? "Sign in to your account"
-                  : "Create a new account"}
-              </CardDescription>
-            </CardHeader>
-            <form onSubmit={handleSubmit}>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider">
-                    Email
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="name@example.com"
-                      className="pl-9 border-2 border-border"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={isLoading}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider">
-                    Password
-                  </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      className="pl-9 border-2 border-border"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={isLoading}
-                      required
-                      minLength={6}
-                    />
-                  </div>
-                </div>
-                {error && (
-                  <p className="text-sm text-red-500 font-medium">{error}</p>
-                )}
-              </CardContent>
-              <CardFooter className="flex-col gap-3 pt-2">
-                <Button
-                  type="submit"
-                  className="w-full bg-foreground text-background hover:bg-foreground/90 border-2 border-foreground"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {mode === "signin" ? "Signing in..." : "Creating account..."}
-                    </>
-                  ) : (
-                    <>
-                      {mode === "signin" ? "Sign In" : "Create Account"}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </>
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={toggleMode}
-                  disabled={isLoading}
-                  className="w-full text-sm"
-                >
-                  {mode === "signin"
-                    ? "Don't have an account? Sign up"
-                    : "Already have an account? Sign in"}
-                </Button>
-                <div className="relative w-full my-1">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t-2 border-border" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground font-bold tracking-wider">
-                      or
-                    </span>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleGuest}
-                  disabled={isLoading}
-                  className="w-full border-2 border-border shadow-[3px_3px_0px_0px] shadow-foreground/10 hover:bg-muted"
-                >
-                  <User className="mr-2 h-4 w-4" />
-                  Continue as Guest
-                </Button>
-              </CardFooter>
-            </form>
-            <div className="py-4 px-6 text-xs text-center text-muted-foreground bg-muted border-t-2 border-border rounded-b-lg">
-              Internal tool — digital document integrity analysis
             </div>
-          </Card>
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="editorial-label">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  className="nb-input pl-9 h-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
+                  required
+                  minLength={6}
+                />
+              </div>
+            </div>
+
+            {error && (
+              <p className="text-sm text-destructive font-medium">{error}</p>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full nb-btn-primary bg-foreground text-background h-10"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {mode === "signin" ? "Signing in..." : "Creating account..."}
+                </>
+              ) : (
+                <>
+                  {mode === "signin" ? "Sign In" : "Create Account"}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
+
+            <button
+              type="button"
+              onClick={toggleMode}
+              disabled={isLoading}
+              className="w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
+            >
+              {mode === "signin"
+                ? "Don't have an account? Sign up"
+                : "Already have an account? Sign in"}
+            </button>
+          </form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-background px-3 text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-widest">
+                or
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGuest}
+            disabled={isLoading}
+            className="w-full nb-btn-outline py-2.5 bg-background text-foreground flex items-center justify-center gap-2"
+          >
+            <User className="w-4 h-4" />
+            Continue as Guest
+          </button>
+
+          <p className="text-center text-[10px] text-muted-foreground mt-8 font-mono">
+            Internal tool — digital document integrity analysis
+          </p>
         </div>
       </div>
     </div>

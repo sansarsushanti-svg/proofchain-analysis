@@ -4,12 +4,7 @@ import { createSession } from "@/lib/sessionStore";
 import { AppNav } from "@/components/shared/AppNav";
 import { FileUpload, FilePreview } from "@/components/shared/FileUpload";
 import { motion } from "framer-motion";
-import {
-  ArrowLeft,
-  Play,
-  Beaker,
-  AlertTriangle,
-} from "lucide-react";
+import { ArrowLeft, Play, Beaker, AlertTriangle } from "lucide-react";
 import {
   generateDemoInvoiceCanvas,
   canvasToDataUrl,
@@ -43,18 +38,10 @@ export default function Upload() {
   const handleLoadDemo = useCallback(async (manipulated: boolean) => {
     const canvas = generateDemoInvoiceCanvas(manipulated);
     const dataUrl = canvasToDataUrl(canvas);
-
-    // Convert data URL to File object
     const res = await fetch(dataUrl);
     const blob = await res.blob();
-    const fileName = manipulated
-      ? DEMO_FILES[1].name
-      : DEMO_FILES[0].name;
-
-    const file = new File([blob], fileName, {
-      type: "image/png",
-    });
-
+    const fileName = manipulated ? DEMO_FILES[1].name : DEMO_FILES[0].name;
+    const file = new File([blob], fileName, { type: "image/png" });
     setSelectedFile({
       file,
       dataUrl,
@@ -67,19 +54,18 @@ export default function Upload() {
 
   const handleAnalyze = useCallback(async () => {
     if (!selectedFile) return;
-
     setIsAnalyzing(true);
     setError(null);
-
     try {
       const sessionId = createSession({
         fileName: selectedFile.name,
         fileType: selectedFile.type,
         fileSize: selectedFile.size,
         fileData: selectedFile.dataUrl,
-        isDemo: selectedFile.name.includes("Sample") || selectedFile.name.includes("Altered"),
+        isDemo:
+          selectedFile.name.includes("Sample") ||
+          selectedFile.name.includes("Altered"),
       });
-
       navigate(`/analysis/${sessionId}`);
     } catch (err) {
       setError(
@@ -95,22 +81,25 @@ export default function Upload() {
     <div className="min-h-screen bg-background">
       <AppNav />
 
-      <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen">
-        <div className="p-6 lg:p-10 max-w-4xl">
+      <main className="pt-20 min-h-screen">
+        <div className="max-w-3xl mx-auto px-6 pb-16">
           {/* Header */}
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
             <button
               onClick={() => navigate("/dashboard")}
-              className="flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors mb-4"
+              className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors mb-4"
             >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Dashboard
+              ← Back to Dashboard
             </button>
-            <h1 className="text-3xl font-black uppercase tracking-tight">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-6 h-[1.5px] bg-accent" />
+              <span className="editorial-label">Submit Evidence</span>
+            </div>
+            <h1 className="font-display text-3xl">
               New Analysis
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -120,7 +109,7 @@ export default function Upload() {
 
           {/* Upload area */}
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             className="mb-8"
@@ -128,22 +117,20 @@ export default function Upload() {
             {selectedFile ? (
               <div className="space-y-4">
                 <FilePreview file={selectedFile} onRemove={handleRemoveFile} />
-
-                {/* Analyze button */}
                 <button
                   onClick={handleAnalyze}
                   disabled={isAnalyzing}
-                  className="nb-btn-primary w-full px-8 py-4 bg-foreground text-background flex items-center justify-center gap-3 text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="nb-btn-primary w-full px-6 py-3 bg-foreground text-background flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isAnalyzing ? (
                     <>
-                      <div className="w-5 h-5 border-3 border-background border-t-transparent animate-spin" />
+                      <div className="w-4 h-4 border-2 border-background border-t-transparent animate-spin" />
                       Queuing...
                     </>
                   ) : (
                     <>
-                      <Play className="w-5 h-5" />
-                      Run Analysis
+                      <Play className="w-4 h-4" />
+                      Analyze Document
                     </>
                   )}
                 </button>
@@ -153,69 +140,58 @@ export default function Upload() {
             )}
           </motion.div>
 
-          {/* Error display */}
+          {/* Error */}
           {error && (
-            <div className="mb-8 p-4 border-3 border-red-300 bg-red-50 flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="mb-8 p-4 border border-destructive/30 bg-destructive/5 flex items-start gap-3">
+              <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-sm text-red-700 uppercase">Error</p>
-                <p className="text-sm text-red-600 mt-1">{error}</p>
+                <p className="text-xs font-bold text-destructive uppercase">Error</p>
+                <p className="text-sm text-destructive/80 mt-0.5">{error}</p>
               </div>
             </div>
           )}
 
-          {/* Demo data section */}
+          {/* Sample data */}
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <div className="nb-card p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-accent text-foreground flex items-center justify-center border-2 border-border">
-                  <Beaker className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-black uppercase tracking-wider text-sm">
-                    Sample Data
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Load a sample invoice to test the pipeline
-                  </p>
-                </div>
-              </div>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-4 h-[1.5px] bg-border" />
+              <span className="editorial-label">Sample Data</span>
+            </div>
 
-              <div className="grid sm:grid-cols-2 gap-3">
-                {DEMO_FILES.map((demo) => (
-                  <button
-                    key={demo.id}
-                    onClick={() => handleLoadDemo(demo.isManipulated)}
-                    disabled={isAnalyzing}
-                    className="p-4 border-2 border-border text-left hover:bg-muted transition-colors disabled:opacity-50"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-muted border-2 border-border flex items-center justify-center shrink-0">
-                        {demo.isManipulated ? (
-                          <AlertTriangle className="w-4 h-4 text-amber-600" />
-                        ) : (
-                          <Beaker className="w-4 h-4" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold">{demo.name}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {demo.description}
-                        </p>
-                        {demo.manipulation && (
-                          <p className="text-[10px] font-bold text-amber-700 mt-1 uppercase tracking-wider">
-                            {demo.manipulation}
-                          </p>
-                        )}
-                      </div>
+            <div className="grid sm:grid-cols-2 gap-px bg-border border border-border">
+              {DEMO_FILES.map((demo) => (
+                <button
+                  key={demo.id}
+                  onClick={() => handleLoadDemo(demo.isManipulated)}
+                  disabled={isAnalyzing}
+                  className="bg-card p-5 text-left hover:bg-secondary/30 transition-colors disabled:opacity-50"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5">
+                      {demo.isManipulated ? (
+                        <AlertTriangle className="w-4 h-4 text-accent" />
+                      ) : (
+                        <Beaker className="w-4 h-4 text-muted-foreground" />
+                      )}
                     </div>
-                  </button>
-                ))}
-              </div>
+                    <div>
+                      <p className="text-sm font-medium">{demo.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {demo.description}
+                      </p>
+                      {demo.manipulation && (
+                        <p className="text-[10px] font-bold text-accent mt-1.5 uppercase tracking-wider font-mono">
+                          {demo.manipulation}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
             </div>
           </motion.div>
         </div>

@@ -37,7 +37,6 @@ export default function Analysis() {
     [stages]
   );
 
-  // Start analysis when session data is loaded
   useEffect(() => {
     if (!sessionId || isRunning || analysisStarted.current) return;
 
@@ -49,11 +48,8 @@ export default function Analysis() {
     const runAnalysis = async () => {
       try {
         setIsRunning(true);
-
-        // Update status to analyzing
         updateSession(sessionId, { status: "analyzing" });
 
-        // Run forensic analysis
         const result = await runForensicAnalysis(
           {
             name: session.fileName,
@@ -61,35 +57,33 @@ export default function Analysis() {
             size: session.fileSize,
             dataUrl: session.fileData,
           },
-          {
-            onStageUpdate: handleStageUpdate,
-          }
+          { onStageUpdate: handleStageUpdate }
         );
 
-        // Insert findings into local store
         if (result.findings.length > 0) {
-          bulkInsertFindings(sessionId, result.findings.map((f) => ({
-            category: f.category,
-            finding: f.finding,
-            severity: f.severity,
-            confidence: f.confidence,
-            evidence: f.evidence,
-            technicalExplanation: f.technicalExplanation,
-            userExplanation: f.userExplanation,
-            region: f.region,
-          })));
+          bulkInsertFindings(
+            sessionId,
+            result.findings.map((f) => ({
+              category: f.category,
+              finding: f.finding,
+              severity: f.severity,
+              confidence: f.confidence,
+              evidence: f.evidence,
+              technicalExplanation: f.technicalExplanation,
+              userExplanation: f.userExplanation,
+              region: f.region,
+            }))
+          );
         }
 
-        // Generate AI explanation
         let aiExplanation = "";
         try {
           const explanation = generateAiExplanation(result);
           aiExplanation = JSON.stringify(explanation);
         } catch {
-          // AI explanation failed, continue without it
+          // continue without AI
         }
 
-        // Update session with results
         updateSession(sessionId, {
           status: "completed",
           integrityScore: result.integrityScore,
@@ -97,7 +91,6 @@ export default function Analysis() {
           aiExplanation,
         });
 
-        // Navigate to results
         navigate(`/results/${sessionId}`);
       } catch (err) {
         console.error("Analysis failed:", err);
@@ -106,14 +99,9 @@ export default function Analysis() {
             ? err.message
             : "Analysis failed. Please try again."
         );
-
-        // Update session to failed state
         try {
           updateSession(sessionId, { status: "failed" });
-        } catch {
-          // Ignore update errors
-        }
-
+        } catch {}
         setIsRunning(false);
       }
     };
@@ -125,40 +113,46 @@ export default function Analysis() {
     <div className="min-h-screen bg-background">
       <AppNav />
 
-      <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen">
-        <div className="p-6 lg:p-10 max-w-4xl mx-auto">
+      <main className="pt-20 min-h-screen">
+        <div className="max-w-2xl mx-auto px-6 pb-16">
           {error ? (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="nb-card p-8 text-center"
+              className="border border-border bg-card p-10 text-center mt-16"
             >
-              <div className="w-16 h-16 bg-red-100 border-3 border-red-300 flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">⚠</span>
-              </div>
-              <h2 className="text-xl font-black uppercase tracking-wider mb-2">
+              <p className="text-sm text-destructive font-medium mb-2">
                 Analysis Failed
-              </h2>
+              </p>
               <p className="text-sm text-muted-foreground mb-6">{error}</p>
               <button
                 onClick={() => navigate("/upload")}
-                className="nb-btn-primary px-6 py-3 bg-foreground text-background text-sm"
+                className="nb-btn-primary px-5 py-2.5 bg-foreground text-background"
               >
                 Try Again
               </button>
             </motion.div>
           ) : (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
+              className="mt-16"
             >
-              <AnalysisProgress stages={stages} currentStageIndex={currentStageIndex} />
-
-              <div className="mt-8 text-center">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                  Please do not close this page during analysis
-                </p>
+              <div className="mb-8">
+                <span className="editorial-label">Analysis in progress</span>
+                <h1 className="font-display text-2xl mt-2">
+                  Running forensic pipeline
+                </h1>
               </div>
+
+              <AnalysisProgress
+                stages={stages}
+                currentStageIndex={currentStageIndex}
+              />
+
+              <p className="text-xs text-muted-foreground text-center mt-8 font-mono">
+                Please do not close this page during analysis
+              </p>
             </motion.div>
           )}
         </div>

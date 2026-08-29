@@ -28,53 +28,33 @@ export function CategorySummaryCard({
   const Icon = ICONS[id] || FileText;
 
   return (
-    <div
-      className={cn(
-        "border-3 p-4 transition-all",
-        hasAnomalies
-          ? "border-foreground bg-card"
-          : "border-emerald-300 bg-emerald-50/50"
-      )}
-    >
-      {/* Icon and label */}
-      <div className="flex items-center gap-3 mb-3">
-        <div
-          className={cn(
-            "w-10 h-10 flex items-center justify-center border-2",
-            hasAnomalies
-              ? "bg-foreground text-background border-foreground"
-              : "bg-emerald-100 text-emerald-700 border-emerald-300"
-          )}
-        >
-          <Icon className="w-5 h-5" />
+    <div className="p-4 bg-card">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="editorial-label">{label}</span>
         </div>
-        <div>
-          <p className="text-sm font-black uppercase tracking-wider">{label}</p>
-          <p className="text-[10px] text-muted-foreground">
-            {totalFindings} finding{totalFindings !== 1 ? "s" : ""}
-          </p>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="flex items-center justify-between">
-        <div>
+        {hasAnomalies ? (
           <span
-            className={cn(
-              "nb-badge px-2 py-0.5",
-              hasAnomalies
-                ? "bg-amber-100 text-amber-800 border-amber-500"
-                : "bg-emerald-100 text-emerald-700 border-emerald-500"
-            )}
+            className="nb-badge px-1.5 py-0.5"
+            style={{
+              backgroundColor: "#A85D4515",
+              color: "#A85D45",
+              borderColor: "#A85D4540",
+            }}
           >
-            {hasAnomalies ? `${anomalyCount} ISSUE${anomalyCount !== 1 ? "S" : ""}` : "CLEAR"}
+            {anomalyCount} ISSUE{anomalyCount !== 1 ? "S" : ""}
           </span>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">Confidence</p>
-          <p className="text-sm font-bold">{avgConfidence}%</p>
-        </div>
+        ) : (
+          <span className="nb-badge px-1.5 py-0.5 bg-secondary text-muted-foreground border-border">
+            CLEAR
+          </span>
+        )}
       </div>
+      <p className="text-xs text-muted-foreground font-mono">
+        {totalFindings} finding{totalFindings !== 1 ? "s" : ""} ·{" "}
+        {avgConfidence}% avg confidence
+      </p>
     </div>
   );
 }

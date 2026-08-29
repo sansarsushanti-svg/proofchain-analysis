@@ -1,76 +1,73 @@
 import { useState } from "react";
 import type { ForensicFinding } from "@/lib/forensics/types";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface FindingCardProps {
   finding: ForensicFinding;
+  index?: number;
   defaultExpanded?: boolean;
 }
 
-export function FindingCard({ finding, defaultExpanded = false }: FindingCardProps) {
+export function FindingCard({
+  finding,
+  index = 0,
+  defaultExpanded = false,
+}: FindingCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
-  const isAnomaly = !finding.finding.toLowerCase().includes("no significant");
+  const isAnomaly = !finding.finding
+    .toLowerCase()
+    .includes("no significant");
 
-  const severityStyles: Record<string, string> = {
-    high: "border-red-300 bg-red-50",
-    medium: "border-amber-300 bg-amber-50",
-    low: "border-border bg-card",
-  };
-
-  const severityBadgeStyles: Record<string, string> = {
-    high: "bg-red-100 text-red-800 border-red-500",
-    medium: "bg-amber-100 text-amber-800 border-amber-500",
-    low: "bg-muted text-muted-foreground border-border",
-  };
+  const severityColor = isAnomaly
+    ? finding.severity === "high"
+      ? "#A85D45"
+      : finding.severity === "medium"
+        ? "#8A8175"
+        : "#6F7658"
+    : "#6F7658";
 
   return (
-    <div
-      className={cn(
-        "border-3 transition-all",
-        isAnomaly ? severityStyles[finding.severity] : "border-emerald-300 bg-emerald-50"
-      )}
-    >
-      {/* Header - always visible */}
+    <div className="border-b border-border last:border-b-0">
+      {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-3 p-4 text-left hover:bg-black/[0.02] transition-colors"
+        className="w-full flex items-start gap-4 p-5 text-left hover:bg-secondary/20 transition-colors"
       >
-        {/* Severity icon */}
-        <div
-          className={cn(
-            "w-8 h-8 flex items-center justify-center border-2 shrink-0",
-            isAnomaly ? "border-current" : "border-emerald-500 bg-emerald-100"
-          )}
-        >
-          {isAnomaly ? (
-            <AlertTriangle className="w-4 h-4" />
-          ) : (
-            <CheckCircle className="w-4 h-4 text-emerald-600" />
-          )}
-        </div>
-
-        {/* Finding info */}
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm truncate">{finding.finding}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {finding.category.replace("_", " ").toUpperCase()} · {finding.confidence}% confidence
-          </p>
-        </div>
-
-        {/* Severity badge */}
-        <span
-          className={cn(
-            "nb-badge px-2 py-0.5 shrink-0",
-            isAnomaly ? severityBadgeStyles[finding.severity] : "bg-emerald-100 text-emerald-800 border-emerald-500"
-          )}
-        >
-          {finding.severity.toUpperCase()}
+        {/* Number */}
+        <span className="evidence-num text-lg mt-0.5 shrink-0">
+          {String(index + 1).padStart(2, "0")}
         </span>
 
-        {/* Expand icon */}
-        <div className="shrink-0 ml-1">
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">{finding.finding}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="editorial-label">
+              {finding.category.replace("_", " ")}
+            </span>
+            <span className="text-[10px] text-border">·</span>
+            <span className="text-[10px] font-mono text-muted-foreground">
+              {finding.confidence}% confidence
+            </span>
+          </div>
+        </div>
+
+        {/* Severity + expand */}
+        <div className="flex items-center gap-2 shrink-0">
+          {isAnomaly && (
+            <span
+              className="nb-badge px-1.5 py-0.5"
+              style={{
+                backgroundColor: `${severityColor}15`,
+                color: severityColor,
+                borderColor: `${severityColor}40`,
+              }}
+            >
+              {finding.severity.toUpperCase()}
+            </span>
+          )}
           {expanded ? (
             <ChevronUp className="w-4 h-4 text-muted-foreground" />
           ) : (
@@ -81,42 +78,32 @@ export function FindingCard({ finding, defaultExpanded = false }: FindingCardPro
 
       {/* Expanded content */}
       {expanded && (
-        <div className="border-t-2 border-current/20 p-4 space-y-3">
-          {/* Evidence */}
+        <div className="px-5 pb-5 pl-[4.5rem] space-y-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
-              Evidence
-            </p>
-            <p className="text-sm leading-relaxed">{finding.evidence}</p>
+            <span className="editorial-label">Evidence</span>
+            <p className="text-sm leading-relaxed mt-1">{finding.evidence}</p>
           </div>
 
-          {/* Technical explanation */}
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
-              Technical Explanation
-            </p>
-            <p className="text-sm leading-relaxed text-muted-foreground">
+            <span className="editorial-label">Technical interpretation</span>
+            <p className="text-sm leading-relaxed text-muted-foreground mt-1">
               {finding.technicalExplanation}
             </p>
           </div>
 
-          {/* User-friendly explanation */}
-          <div className="bg-background/50 p-3 border-2 border-current/10">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
-              What This Means
+          <div>
+            <span className="editorial-label">Human interpretation</span>
+            <p className="text-sm leading-relaxed mt-1">
+              {finding.userExplanation}
             </p>
-            <p className="text-sm leading-relaxed">{finding.userExplanation}</p>
           </div>
 
-          {/* Region info */}
           {finding.region && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
-                Affected Region
-              </p>
-              <p className="text-xs font-mono text-muted-foreground">
-                x: {finding.region.x}, y: {finding.region.y}, 
-                w: {finding.region.width}, h: {finding.region.height}
+              <span className="editorial-label">Affected region</span>
+              <p className="text-xs font-mono text-muted-foreground mt-1">
+                x: {finding.region.x}, y: {finding.region.y}, w:{" "}
+                {finding.region.width}, h: {finding.region.height}
               </p>
             </div>
           )}

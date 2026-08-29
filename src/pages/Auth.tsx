@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 
 import { useAuth } from "@/hooks/use-auth";
 import logo from "@/assets/logo.svg";
-import { ArrowRight, Loader2, Mail, Lock } from "lucide-react";
+import { ArrowRight, Loader2, Mail, Lock, User } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -36,6 +36,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     isAuthenticated,
     signIn,
     signUp,
+    continueAsGuest,
   } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -95,6 +96,11 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const toggleMode = () => {
     setMode(mode === "signin" ? "signup" : "signin");
     setError(null);
+  };
+
+  const handleGuest = () => {
+    continueAsGuest();
+    navigate(redirect);
   };
 
   return (
@@ -194,6 +200,26 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   {mode === "signin"
                     ? "Don't have an account? Sign up"
                     : "Already have an account? Sign in"}
+                </Button>
+                <div className="relative w-full my-1">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground font-bold tracking-wider">
+                      or
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleGuest}
+                  disabled={isLoading}
+                  className="w-full border-2 border-border shadow-[3px_3px_0px_0px] shadow-foreground/10 hover:bg-muted"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Continue as Guest
                 </Button>
               </CardFooter>
             </form>

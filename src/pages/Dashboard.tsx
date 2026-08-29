@@ -43,7 +43,7 @@ const DEMO_SESSIONS: Array<{
 ];
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const navigate = useNavigate();
 
   // Use demo sessions for now (Convex queries will be reconnected when Supabase data layer is set up)
@@ -101,10 +101,10 @@ export default function Dashboard() {
               Dashboard
             </p>
             <h1 className="text-3xl font-black uppercase tracking-tight">
-              Welcome{user?.email ? `, ${user.email.split("@")[0]}` : ""}
+              Welcome{user?.email ? `, ${user.email.split("@")[0]}` : isGuest ? " (Guest)" : ""}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Overview of your forensic analysis sessions.
+              Overview of your forensic analysis sessions.{isGuest ? " You are browsing as a guest — data will not be saved." : ""}
             </p>
           </motion.div>
 

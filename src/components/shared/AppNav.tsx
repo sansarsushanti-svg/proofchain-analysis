@@ -21,7 +21,7 @@ const NAV_ITEMS = [
 ];
 
 export function AppNav() {
-  const { user, signOut } = useAuth();
+  const { user, isGuest, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -72,10 +72,10 @@ export function AppNav() {
         <div className="p-4 border-t-2 border-border">
           <div className="px-4 py-2 mb-2">
             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Signed in as
+              {isGuest ? "Browsing as" : "Signed in as"}
             </p>
             <p className="text-sm font-semibold truncate mt-1">
-              {user?.email || "User"}
+              {isGuest ? "Guest" : user?.email || "User"}
             </p>
           </div>
           <button
@@ -83,7 +83,7 @@ export function AppNav() {
             className="flex items-center gap-3 w-full px-4 py-3 text-sm font-semibold uppercase tracking-wider text-foreground border-2 border-transparent hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-colors"
           >
             <LogOut className="w-4 h-4" />
-            Sign Out
+            {isGuest ? "Exit Guest" : "Sign Out"}
           </button>
         </div>
       </nav>
@@ -136,7 +136,7 @@ export function AppNav() {
               className="flex items-center gap-3 w-full px-4 py-3 text-sm font-semibold uppercase tracking-wider text-red-700 border-2 border-red-300 bg-red-50"
             >
               <LogOut className="w-4 h-4" />
-              Sign Out
+              {isGuest ? "Exit Guest" : "Sign Out"}
             </button>
           </div>
         </div>

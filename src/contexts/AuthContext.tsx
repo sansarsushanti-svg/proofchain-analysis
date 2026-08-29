@@ -9,11 +9,14 @@ import {
 import type { User, Session, AuthError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
+const GUEST_STORAGE_KEY = "proofchain_guest";
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isGuest: boolean;
   signUp: (
     email: string,
     password: string,
@@ -23,6 +26,7 @@ interface AuthContextType {
     password: string,
   ) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
+  continueAsGuest: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -31,12 +35,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGuest, setIsGuest] = useState(() => {
+    return localStorage.getItem(GUEST_STORAGE_KEY) === "true";
+  });
 
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
+      // If there's a real session, clear guest mode
+      if (s) {
+        localStorage.removeItem(GUEST_STORAGE_KEY);
+        setIsGuest(false);
+      }
       setIsLoading(false);
     });
 
@@ -46,7 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setUser(s?.user ?? null);
-      setIsLoading(false);
+      if (s) {
+        localStorage.removeItem(GUEST_STORAGE_KEY);
+        setIsGuest(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -67,6 +82,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    localStorage.removeItem(GUEST_STORAGE_KEY);
+    setIsGuest(false);
+  }, []);
+
+  const continueAsGuest = useCallback(() => {
+    localStorage.setItem(GUEST_STORAGE_KEY, "true");
+    setIsGuest(true);
   }, []);
 
   return (
@@ -75,10 +97,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         session,
         isLoading,
-        isAuthenticated: !!session,
+        isAuthenticated: !!session || isGuest,
+        isGuest,
         signUp,
         signIn,
         signOut,
+        continueAsGuest,
       }}
     >
       {children}

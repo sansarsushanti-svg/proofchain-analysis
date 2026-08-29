@@ -32,7 +32,7 @@ export default function History() {
                 Analysis History
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                View all your forensic analyses and their results.
+                All forensic sessions under your account.
               </p>
             </div>
             <button
@@ -97,10 +97,10 @@ export default function History() {
                   <Clock className="w-8 h-8 text-muted-foreground" />
                 </div>
                 <h3 className="font-black uppercase tracking-wider mb-2">
-                  No completed analyses
+                  No completed sessions
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                  Your completed forensic analyses will appear here.
+                  Completed analyses will appear here.
                 </p>
               </div>
             ) : (

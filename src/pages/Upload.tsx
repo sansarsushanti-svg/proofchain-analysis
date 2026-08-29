@@ -116,7 +116,7 @@ export default function Upload() {
               New Analysis
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Upload a document or image for forensic integrity analysis.
+              Select a file to run through the forensic pipeline.
             </p>
           </motion.div>
 
@@ -140,12 +140,12 @@ export default function Upload() {
                   {isAnalyzing ? (
                     <>
                       <div className="w-5 h-5 border-3 border-background border-t-transparent animate-spin" />
-                      Starting Analysis...
+                      Queuing...
                     </>
                   ) : (
                     <>
                       <Play className="w-5 h-5" />
-                      Begin Forensic Analysis
+                      Run Analysis
                     </>
                   )}
                 </button>
@@ -179,10 +179,10 @@ export default function Upload() {
                 </div>
                 <div>
                   <h3 className="font-black uppercase tracking-wider text-sm">
-                    Demo Data
+                    Sample Data
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Try ProofChain with sample invoices
+                    Load a sample invoice to test the pipeline
                   </p>
                 </div>
               </div>

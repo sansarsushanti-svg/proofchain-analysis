@@ -47,20 +47,19 @@ export default function Results() {
       <div className="min-h-screen bg-background">
         <AppNav />
         <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen flex items-center justify-center">
-          <div className="nb-card p-8 text-center max-w-md">
-            <h2 className="text-xl font-black uppercase tracking-wider mb-2">
-              Results Not Available
+          <div className="nb-card p-8 text-center max-w-md">            <h2 className="text-xl font-black uppercase tracking-wider mb-2">
+              Not Available
             </h2>
             <p className="text-sm text-muted-foreground mb-6">
               {session?.status === "failed"
-                ? "This analysis failed. Please try again."
-                : "This analysis is still in progress or has not been completed."}
+                ? "This analysis failed to complete."
+                : "This session is still in progress or has not completed."}
             </p>
             <button
               onClick={() => navigate("/upload")}
               className="nb-btn-primary px-6 py-3 bg-foreground text-background text-sm"
             >
-              Start New Analysis
+              New Analysis
             </button>
           </div>
         </main>
@@ -145,10 +144,10 @@ export default function Results() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-black uppercase tracking-tight">
-                  Analysis Results
+                  Results
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {session.fileName} · Analyzed {new Date(session.createdAt).toLocaleString()}
+                  {session.fileName} · {new Date(session.createdAt).toLocaleString()}
                 </p>
               </div>
               <button

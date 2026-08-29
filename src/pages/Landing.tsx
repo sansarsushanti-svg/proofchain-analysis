@@ -11,35 +11,35 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const FEATURES = [
+const CAPABILITIES = [
   {
     icon: Scan,
-    title: "Multi-Layer Forensic Analysis",
-    description: "Metadata, image forensics, text analysis, and structure inspection run independently on every file.",
+    title: "Multi-Module Forensic Pipeline",
+    description: "Runs metadata extraction, image forensics, text analysis, and document structure inspection in parallel. Each module is independent and replaceable.",
   },
   {
     icon: BarChart3,
-    title: "Evidence-Backed Scoring",
-    description: "Every integrity score is derived from weighted forensic findings with transparent logic.",
+    title: "Weighted Evidence Scoring",
+    description: "Integrity scores are computed from categorized findings with configurable severity and confidence weights. No opaque ML predictions.",
   },
   {
     icon: Layers,
-    title: "Suspicious Region Detection",
-    description: "Locate modified regions with bounding overlays on analyzed documents and images.",
+    title: "Region-Level Localization",
+    description: "Identifies and overlays bounding boxes on statistically anomalous regions within documents and images.",
   },
   {
     icon: FileSearch,
-    title: "Explainable Findings",
-    description: "Technical evidence paired with plain-English explanations for every finding.",
+    title: "Structured Findings",
+    description: "Every finding includes category, severity, confidence, raw evidence, a technical explanation, and a user-facing summary.",
   },
 ];
 
-const STEPS = [
-  { num: "01", title: "Upload", desc: "Drop a PDF, JPG, or PNG for analysis" },
-  { num: "02", title: "Analyze", desc: "Multi-module forensic pipeline runs" },
-  { num: "03", title: "Localize", desc: "Suspicious regions are identified and visualized" },
-  { num: "04", title: "Explain", desc: "AI translates evidence into clear findings" },
-  { num: "05", title: "Report", desc: "Download a complete forensic report" },
+const PIPELINE = [
+  { num: "01", title: "Ingest", desc: "Accept PDF, JPG, or PNG with type and size validation" },
+  { num: "02", title: "Extract", desc: "Metadata, EXIF, structural properties" },
+  { num: "03", title: "Inspect", desc: "Image forensics, compression analysis, text layout" },
+  { num: "04", title: "Correlate", desc: "Aggregate findings into a single integrity score" },
+  { num: "05", title: "Report", desc: "Explain evidence and export a forensic report" },
 ];
 
 export default function Landing() {
@@ -83,17 +83,6 @@ export default function Landing() {
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          {/* Badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <span className="nb-badge px-4 py-1.5 bg-accent text-foreground border-accent-foreground">
-              DIGITAL FORENSICS PLATFORM
-            </span>
-          </motion.div>
-
           {/* Main heading */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
@@ -101,11 +90,8 @@ export default function Landing() {
             transition={{ delay: 0.2 }}
             className="mt-8 text-6xl sm:text-7xl md:text-8xl font-black uppercase tracking-tighter leading-[0.9]"
           >
-            Know what
-            <br />
-            happened to
-            <br />
-            your <span className="text-accent">file.</span>
+            Proof
+            <span className="text-accent">Chain</span>
           </motion.h1>
 
           {/* Subheadline */}
@@ -115,8 +101,8 @@ export default function Landing() {
             transition={{ delay: 0.3 }}
             className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed"
           >
-            Evidence-backed digital integrity analysis for documents and images.
-            Detect anomalies, localize suspicious regions, and generate forensic reports.
+            Digital document integrity analysis. Detect tampering indicators,
+            localize suspicious regions, and generate evidence-backed reports.
           </motion.p>
 
           {/* CTAs */}
@@ -130,31 +116,31 @@ export default function Landing() {
               onClick={() => navigate("/auth")}
               className="nb-btn-primary px-8 py-4 text-base bg-foreground text-background w-full sm:w-auto"
             >
-              Analyze a Document
+              Sign In
               <ArrowRight className="w-5 h-5 ml-2 inline" />
             </button>
             <a
               href="#how-it-works"
               className="nb-btn-outline px-8 py-4 text-base w-full sm:w-center text-center"
             >
-              See How It Works
+              How It Works
             </a>
           </motion.div>
         </div>
       </section>
 
-      {/* Stats bar */}
-      <section className="border-y-2 border-border bg-foreground text-background">
+      {/* Technical specs bar */}
+      <section className="border-y-2 border-border">
         <div className="max-w-6xl mx-auto px-6 py-6 grid grid-cols-2 sm:grid-cols-4 gap-6">
           {[
             { label: "Modules", value: "4" },
             { label: "Finding Types", value: "12+" },
-            { label: "Evidence Types", value: "50+" },
-            { label: "Analysis Time", value: "<30s" },
+            { label: "Evidence Signals", value: "50+" },
+            { label: "Analysis", value: "<30s" },
           ].map((stat) => (
             <div key={stat.label} className="text-center">
               <p className="text-2xl sm:text-3xl font-black">{stat.value}</p>
-              <p className="text-xs font-bold uppercase tracking-wider opacity-60 mt-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-1">
                 {stat.label}
               </p>
             </div>
@@ -168,15 +154,14 @@ export default function Landing() {
           <div className="text-center mb-12">
             <span className="nb-badge px-3 py-1 bg-muted">CAPABILITIES</span>
             <h2 className="mt-4 text-3xl sm:text-4xl font-black uppercase tracking-tight">
-              Not Just Detection.
-              <br />Evidence & Explanation.
+              How It Analyzes
             </h2>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
-            {FEATURES.map((feature, idx) => (
+            {CAPABILITIES.map((cap, idx) => (
               <motion.div
-                key={feature.title}
+                key={cap.title}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -184,13 +169,13 @@ export default function Landing() {
                 className="nb-card p-6"
               >
                 <div className="w-12 h-12 bg-foreground text-background flex items-center justify-center mb-4">
-                  <feature.icon className="w-6 h-6" />
+                  <cap.icon className="w-6 h-6" />
                 </div>
                 <h3 className="font-black uppercase tracking-wider text-sm mb-2">
-                  {feature.title}
+                  {cap.title}
                 </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  {feature.description}
+                  {cap.description}
                 </p>
               </motion.div>
             ))}
@@ -202,14 +187,14 @@ export default function Landing() {
       <section id="how-it-works" className="py-20 px-6 bg-muted border-y-2 border-border">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
-            <span className="nb-badge px-3 py-1 bg-background border-border">PROCESS</span>
+            <span className="nb-badge px-3 py-1 bg-background border-border">PIPELINE</span>
             <h2 className="mt-4 text-3xl sm:text-4xl font-black uppercase tracking-tight">
-              Five-Step Forensic Pipeline
+              Analysis Pipeline
             </h2>
           </div>
 
           <div className="grid sm:grid-cols-5 gap-4">
-            {STEPS.map((step, idx) => (
+            {PIPELINE.map((step, idx) => (
               <motion.div
                 key={step.num}
                 initial={{ opacity: 0, y: 20 }}
@@ -241,17 +226,17 @@ export default function Landing() {
               <AlertTriangle className="w-8 h-8 text-background" />
             </div>
             <h2 className="text-3xl font-black uppercase tracking-tight mb-4">
-              Detect. Localize. Explain. Report.
+              Evidence Over Guesswork
             </h2>
             <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
-              ProofChain provides evidence-backed forensic analysis — not AI guesses.
-              Every finding comes with technical evidence and a clear explanation.
+              ProofChain does not label files as fake. It surfaces anomalies,
+              provides the evidence, and lets you assess the findings.
             </p>
             <button
               onClick={() => navigate("/auth")}
               className="nb-btn-primary px-8 py-4 text-base bg-foreground text-background"
             >
-              Start Analysis
+              Sign In
               <ChevronRight className="w-5 h-5 ml-2 inline" />
             </button>
           </div>
@@ -266,8 +251,7 @@ export default function Landing() {
             <span className="text-sm font-black uppercase">ProofChain</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Evidence-backed digital integrity analysis platform.
-            This is a demonstration product.
+            Internal tool — digital document integrity analysis.
           </p>
         </div>
       </footer>

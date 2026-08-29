@@ -64,7 +64,7 @@ export default function Reports() {
                 Reports
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Download forensic analysis reports for your records.
+                Export forensic reports from completed sessions.
               </p>
             </div>
             <button
@@ -92,16 +92,16 @@ export default function Reports() {
                 <FileText className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="font-black uppercase tracking-wider mb-2">
-                No reports yet
+                No sessions yet
               </h3>
               <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-                Complete a forensic analysis to generate your first report.
+                Complete an analysis to generate a report.
               </p>
               <button
                 onClick={() => navigate("/upload")}
                 className="nb-btn-primary px-6 py-3 bg-foreground text-background text-sm"
               >
-                Start Analysis
+                New Analysis
               </button>
             </motion.div>
           ) : (

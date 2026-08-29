@@ -54,7 +54,7 @@ export default function Dashboard() {
               Welcome{user?.name ? `, ${user.name}` : ""}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Evidence-backed digital integrity analysis for documents and images.
+              Overview of your forensic analysis sessions.
             </p>
           </motion.div>
 
@@ -116,16 +116,16 @@ export default function Dashboard() {
                 <div className="w-16 h-16 bg-muted border-3 border-border flex items-center justify-center mx-auto mb-4">
                   <Shield className="w-8 h-8 text-muted-foreground" />
                 </div>
-                <h3 className="font-black uppercase tracking-wider mb-2">No analyses yet</h3>
+                <h3 className="font-black uppercase tracking-wider mb-2">No sessions yet</h3>
                 <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-                  Upload your first document to start a forensic analysis.
+                  Run your first forensic analysis to get started.
                 </p>
                 <button
                   onClick={() => navigate("/upload")}
                   className="nb-btn-primary px-6 py-3 bg-foreground text-background text-sm"
                 >
                   <Plus className="w-4 h-4 mr-2 inline" />
-                  Start Analysis
+                  New Analysis
                 </button>
               </div>
             ) : (

@@ -8,6 +8,9 @@ import { runForensicAnalysis } from "@/lib/forensics/engine";
 import { generateAiExplanation } from "@/lib/ai";
 import { motion } from "framer-motion";
 
+/** Safety timeout: if analysis takes longer than this, show an error. */
+const SAFETY_TIMEOUT_MS = 120_000; // 2 minutes
+
 export default function Analysis() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
@@ -29,18 +32,20 @@ export default function Analysis() {
       });
 
       setCurrentStageIndex((prev) => {
-        const idx = stages.findIndex((s) => s.id === stageId);
-        if (status === "completed") return idx + 1;
-        return idx;
+        // Use ANALYSIS_STAGES (static) to avoid stale closure
+        const idx = ANALYSIS_STAGES.findIndex((s) => s.id === stageId);
+        if (status === "completed") return Math.max(prev, idx + 1);
+        return Math.max(prev, idx);
       });
     },
-    [stages],
+    [],
   );
 
   useEffect(() => {
     if (!sessionId || isRunning || analysisStarted.current) return;
 
     let cancelled = false;
+    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
 
     const runAnalysis = async () => {
       const session = await getSession(sessionId);
@@ -48,6 +53,15 @@ export default function Analysis() {
       if (cancelled) return;
 
       analysisStarted.current = true;
+
+      // Safety timeout: if analysis takes too long, show error
+      safetyTimer = setTimeout(() => {
+        if (!cancelled) {
+          console.error("[ProofChain] Safety timeout reached");
+          setError("Analysis timed out. The document may be too large or a required service is unavailable. Please try again.");
+          setIsRunning(false);
+        }
+      }, SAFETY_TIMEOUT_MS);
 
       try {
         setIsRunning(true);
@@ -100,7 +114,7 @@ export default function Analysis() {
 
         navigate(`/results/${sessionId}`);
       } catch (err) {
-        console.error("Analysis failed:", err);
+        console.error("[ProofChain] Analysis failed:", err);
         if (cancelled) return;
         setError(
           err instanceof Error
@@ -111,6 +125,8 @@ export default function Analysis() {
           await updateSession(sessionId, { status: "failed" });
         } catch {}
         setIsRunning(false);
+      } finally {
+        if (safetyTimer) clearTimeout(safetyTimer);
       }
     };
 
@@ -118,6 +134,7 @@ export default function Analysis() {
 
     return () => {
       cancelled = true;
+      if (safetyTimer) clearTimeout(safetyTimer);
     };
   }, [sessionId, isRunning, handleStageUpdate, navigate]);
 

@@ -9,6 +9,29 @@ import { runOcr } from "./ocr";
 import { analyzeInvoice } from "./invoiceAnalysis";
 import { correlateEvidence } from "./correlation";
 
+const LOG_PREFIX = "[ProofChain]";
+
+function log(msg: string) {
+  console.log(`${LOG_PREFIX} ${msg}`);
+}
+
+function logError(msg: string, err?: unknown) {
+  console.error(`${LOG_PREFIX} ${msg}`, err ?? "");
+}
+
+/**
+ * Race a promise against a timeout.
+ * Returns the promise result or throws a timeout error.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+    ),
+  ]);
+}
+
 export type AnalysisCallback = (stage: string, status: "analyzing" | "completed") => void;
 
 export interface EngineOptions {
@@ -29,12 +52,15 @@ export async function runForensicAnalysis(
   const modulesRun: string[] = [];
 
   const update = (stage: string, status: "analyzing" | "completed") => {
+    log(`Stage: ${stage} [${status}]`);
     onStageUpdate?.(stage, status);
   };
 
   const fileType = file.type.toLowerCase();
   const isImage = fileType.includes("image") || fileType.includes("png") || fileType.includes("jpeg") || fileType.includes("jpg");
   const isPdf = fileType.includes("pdf");
+
+  log(`File: ${file.name} (${file.type}), isPdf=${isPdf}, isImage=${isImage}`);
 
   // Track rendered PDF image for downstream analysis
   let renderedPdfDataUrl: string | null = null;
@@ -55,7 +81,9 @@ export async function runForensicAnalysis(
     });
     allFindings.push(...metadataFindings);
     modulesRun.push("metadata");
+    log(`Metadata: ${metadataFindings.length} finding(s)`);
   } catch (error) {
+    logError("Metadata analysis failed:", error);
     allFindings.push({
       category: "metadata",
       finding: "Metadata analysis failed",
@@ -74,13 +102,21 @@ export async function runForensicAnalysis(
   if (isPdf) {
     update("render", "analyzing");
     try {
-      const rendered = await renderPdfPage(file.dataUrl);
+      log("Starting PDF render (timeout: 30s)...");
+      const rendered = await withTimeout(
+        renderPdfPage(file.dataUrl),
+        30_000,
+        "PDF rendering"
+      );
       if (rendered) {
         renderedPdfDataUrl = rendered.dataUrl;
         modulesRun.push("pdf_render");
+        log(`PDF rendered: ${rendered.width}x${rendered.height}, ${rendered.totalPages} page(s)`);
+      } else {
+        log("PDF render returned null");
       }
     } catch (error) {
-      console.error("PDF rendering failed:", error);
+      logError("PDF rendering failed:", error);
     }
     update("render", "completed");
 
@@ -90,7 +126,9 @@ export async function runForensicAnalysis(
       const pdfFindings = analyzePdfStructure(file.dataUrl, file.name);
       allFindings.push(...pdfFindings);
       modulesRun.push("pdf_structure");
+      log(`PDF structure: ${pdfFindings.length} finding(s)`);
     } catch (error) {
+      logError("PDF structure analysis failed:", error);
       allFindings.push({
         category: "pdf_structure",
         finding: "PDF analysis failed",
@@ -107,13 +145,21 @@ export async function runForensicAnalysis(
     if (renderedPdfDataUrl) {
       update("ocr", "analyzing");
       try {
-        const ocrResult = await runOcr(renderedPdfDataUrl);
+        log("Starting OCR (timeout: 60s)...");
+        const ocrResult = await withTimeout(
+          runOcr(renderedPdfDataUrl),
+          60_000,
+          "OCR"
+        );
         if (ocrResult.success) {
           ocrWords = ocrResult.words;
           modulesRun.push("ocr");
+          log(`OCR: ${ocrWords.length} word(s), confidence=${ocrResult.confidence.toFixed(1)}%`);
+        } else {
+          logError("OCR returned failure:", ocrResult.error);
         }
       } catch (error) {
-        console.error("OCR failed:", error);
+        logError("OCR failed:", error);
       }
       update("ocr", "completed");
 
@@ -128,6 +174,7 @@ export async function runForensicAnalysis(
             const amountsDesc = invoiceResult.amounts
               .map((a) => `${a.originalText} (${a.role})`)
               .join(", ");
+            log(`Invoice: ${invoiceResult.amounts.length} amount(s): ${amountsDesc}`);
             allFindings.push({
               category: "invoice_analysis",
               finding: `Detected ${invoiceResult.amounts.length} currency amount(s) in document`,
@@ -137,10 +184,13 @@ export async function runForensicAnalysis(
               technicalExplanation: `Extracted ${invoiceResult.amounts.length} currency amounts from OCR data: ${amountsDesc}.`,
               userExplanation: `Found ${invoiceResult.amounts.length} monetary values in the document.`,
             });
+          } else {
+            log("Invoice: no currency amounts detected");
           }
 
           // Add arithmetic check findings
           for (const check of invoiceResult.arithmeticChecks) {
+            log(`Arithmetic check: ${check.description} -> ${check.passed ? "PASS" : "FAIL"}`);
             if (!check.passed) {
               allFindings.push({
                 category: "invoice_analysis",
@@ -156,15 +206,16 @@ export async function runForensicAnalysis(
 
           modulesRun.push("invoice_analysis");
         } catch (error) {
-          console.error("Invoice analysis failed:", error);
+          logError("Invoice analysis failed:", error);
         }
         update("invoice", "completed");
       } else {
+        log("Skipping invoice analysis (no OCR words)");
         update("invoice", "analyzing");
         update("invoice", "completed");
       }
     } else {
-      // PDF didn't render — skip OCR and invoice analysis
+      log("Skipping OCR and invoice analysis (PDF did not render)");
       update("ocr", "analyzing");
       update("ocr", "completed");
       update("invoice", "analyzing");
@@ -191,13 +242,20 @@ export async function runForensicAnalysis(
 
   if (imageForForensics) {
     try {
-      imageForensicsFindings = await analyzeImageForensics(
-        imageForForensics,
-        isPdf ? "image/png" : file.type // Rendered PDF is always PNG
+      log("Starting image forensics (timeout: 30s)...");
+      imageForensicsFindings = await withTimeout(
+        analyzeImageForensics(
+          imageForForensics,
+          isPdf ? "image/png" : file.type // Rendered PDF is always PNG
+        ),
+        30_000,
+        "Image forensics"
       );
       allFindings.push(...imageForensicsFindings);
       modulesRun.push("image_forensics");
+      log(`Image forensics: ${imageForensicsFindings.length} finding(s)`);
     } catch (error) {
+      logError("Image forensics failed:", error);
       allFindings.push({
         category: "image_forensics",
         finding: "Image forensics failed",
@@ -208,10 +266,12 @@ export async function runForensicAnalysis(
         userExplanation: "Image analysis could not be completed.",
       });
     }
+  } else {
+    log("Skipping image forensics (no image available)");
   }
   update("forensics", "completed");
 
-  // ── Stage 7b: Text/layout analysis (for images) ──
+  // ── Stage 7b: Text/layout analysis (for images only) ──
   if (isImage) {
     try {
       const textFindings = analyzeTextAndLayout(file.dataUrl, file.type);
@@ -234,9 +294,12 @@ export async function runForensicAnalysis(
     allFindings.push(...correlationFindings);
     if (correlationFindings.length > 0) {
       modulesRun.push("correlation");
+      log(`Correlation: ${correlationFindings.length} finding(s)`);
+    } else {
+      log("Correlation: no overlapping regions found");
     }
   } catch (error) {
-    console.error("Correlation failed:", error);
+    logError("Correlation failed:", error);
   }
   update("correlate", "completed");
 
@@ -249,6 +312,7 @@ export async function runForensicAnalysis(
     fileSize: file.size,
     modulesRun,
   });
+  log(`Score: ${result.integrityScore}/100 (${result.riskLevel}), ${result.findings.length} total finding(s), modules: [${modulesRun.join(", ")}]`);
   update("score", "completed");
 
   // ── Stage 10: Prepare explanation ──
@@ -256,5 +320,6 @@ export async function runForensicAnalysis(
   // Explanation is generated synchronously from findings (in ai.ts)
   update("explain", "completed");
 
+  log("Complete");
   return result;
 }

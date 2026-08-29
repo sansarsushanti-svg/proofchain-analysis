@@ -31,6 +31,18 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
 }
 
 /**
+ * Race a promise against a timeout.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+    ),
+  ]);
+}
+
+/**
  * Render the first page of a PDF to a canvas.
  * Returns the canvas, dimensions, data URL, and page info.
  * Returns null if rendering fails.
@@ -43,7 +55,9 @@ export async function renderPdfPage(
     const bytes = dataUrlToBytes(dataUrl);
 
     const loadingTask = pdfjsLib.getDocument({ data: bytes });
-    const pdfDoc = await loadingTask.promise;
+
+    // Timeout on document loading (which requires the worker)
+    const pdfDoc = await withTimeout(loadingTask.promise, 15_000, "PDF document load");
 
     const totalPages = pdfDoc.numPages;
     const page = await pdfDoc.getPage(1);
@@ -54,11 +68,15 @@ export async function renderPdfPage(
     canvas.width = viewport.width;
     canvas.height = viewport.height;
 
-    // Render using canvas parameter (new pdfjs-dist API)
-    await page.render({
-      canvas,
-      viewport,
-    }).promise;
+    // Timeout on page rendering
+    await withTimeout(
+      page.render({
+        canvas,
+        viewport,
+      }).promise,
+      15_000,
+      "PDF page render"
+    );
 
     const dataUrlOut = canvas.toDataURL("image/png");
 
@@ -71,7 +89,7 @@ export async function renderPdfPage(
       totalPages,
     };
   } catch (error) {
-    console.error("PDF rendering failed:", error);
+    console.error("[ProofChain] PDF rendering failed:", error);
     return null;
   }
 }

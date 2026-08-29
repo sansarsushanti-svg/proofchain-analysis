@@ -25,6 +25,18 @@ export interface OcrResult {
 }
 
 /**
+ * Race a promise against a timeout.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+    ),
+  ]);
+}
+
+/**
  * Run OCR on an image data URL.
  * Returns structured results with word-level bounding boxes.
  * Returns a structured failure if OCR cannot initialize or fails.
@@ -33,9 +45,20 @@ export async function runOcr(imageDataUrl: string): Promise<OcrResult> {
   let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
 
   try {
-    worker = await createWorker("eng");
+    // createWorker downloads language data from CDN — can hang if unreachable
+    console.log("[ProofChain] OCR: creating worker (timeout: 30s)...");
+    worker = await withTimeout(
+      createWorker("eng"),
+      30_000,
+      "OCR worker creation"
+    );
+    console.log("[ProofChain] OCR: worker created, starting recognition (timeout: 30s)...");
 
-    const { data } = await worker.recognize(imageDataUrl);
+    const { data } = await withTimeout(
+      worker.recognize(imageDataUrl),
+      30_000,
+      "OCR recognition"
+    );
 
     const words: OcrWord[] = [];
 
@@ -61,6 +84,7 @@ export async function runOcr(imageDataUrl: string): Promise<OcrResult> {
       }
     }
 
+    console.log(`[ProofChain] OCR: done — ${words.length} word(s), confidence=${data.confidence.toFixed(1)}%`);
     return {
       text: data.text,
       words,
@@ -68,6 +92,7 @@ export async function runOcr(imageDataUrl: string): Promise<OcrResult> {
       success: true,
     };
   } catch (error) {
+    console.error("[ProofChain] OCR failed:", error);
     return {
       text: "",
       words: [],
@@ -77,7 +102,11 @@ export async function runOcr(imageDataUrl: string): Promise<OcrResult> {
     };
   } finally {
     if (worker) {
-      await worker.terminate();
+      try {
+        await worker.terminate();
+      } catch {
+        // ignore termination errors
+      }
     }
   }
 }

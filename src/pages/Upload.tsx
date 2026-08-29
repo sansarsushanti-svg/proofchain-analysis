@@ -1,7 +1,6 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { createSession } from "@/lib/sessionStore";
 import { AppNav } from "@/components/shared/AppNav";
 import { FileUpload, FilePreview } from "@/components/shared/FileUpload";
 import { motion } from "framer-motion";
@@ -27,7 +26,6 @@ interface UploadedFile {
 
 export default function Upload() {
   const navigate = useNavigate();
-  const createSession = useMutation(api.analysisSessions.createSession);
   const [selectedFile, setSelectedFile] = useState<UploadedFile | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +72,7 @@ export default function Upload() {
     setError(null);
 
     try {
-      const sessionId = await createSession({
+      const sessionId = createSession({
         fileName: selectedFile.name,
         fileType: selectedFile.type,
         fileSize: selectedFile.size,
@@ -91,7 +89,7 @@ export default function Upload() {
       );
       setIsAnalyzing(false);
     }
-  }, [selectedFile, createSession, navigate]);
+  }, [selectedFile, navigate]);
 
   return (
     <div className="min-h-screen bg-background">

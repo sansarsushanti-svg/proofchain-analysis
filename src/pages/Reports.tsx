@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { getAllSessions, getSessionFindings } from "@/lib/sessionStore";
 import { AppNav } from "@/components/shared/AppNav";
 import { RiskBadge } from "@/components/shared/RiskBadge";
 import { motion } from "framer-motion";
@@ -10,17 +9,25 @@ import { generateAiExplanation, type AiExplanation as AiExplanationType } from "
 import { downloadReport } from "@/lib/reportGenerator";
 
 export default function Reports() {
-  const sessions = useQuery(api.analysisSessions.getSessionsByUser);
-  const allFindings = sessions
-    ?.filter((s) => s.status === "completed")
-    .map(() => []) || [];
   const navigate = useNavigate();
+  const allSessions = getAllSessions();
+  const completedSessions = allSessions.filter((s) => s.status === "completed");
 
-  const completedSessions = sessions?.filter((s) => s.status === "completed") || [];
+  const handleDownloadReport = (sessionId: string) => {
+    const session = allSessions.find((s) => s._id === sessionId);
+    if (!session) return;
 
-  const handleDownloadReport = (session: typeof completedSessions[0]) => {
-    // Reconstruct minimal findings for report
-    const findings: ForensicFinding[] = [];
+    const dbFindings = getSessionFindings(sessionId);
+    const findings: ForensicFinding[] = dbFindings.map((f) => ({
+      category: f.category as ForensicFinding["category"],
+      finding: f.finding,
+      severity: f.severity as ForensicFinding["severity"],
+      confidence: f.confidence,
+      evidence: f.evidence,
+      technicalExplanation: f.technicalExplanation,
+      userExplanation: f.userExplanation,
+      region: f.region,
+    }));
 
     let aiExplanation: AiExplanationType | null = null;
     if (session.aiExplanation) {
@@ -77,12 +84,7 @@ export default function Reports() {
           </motion.div>
 
           {/* Reports list */}
-          {sessions === undefined ? (
-            <div className="nb-card p-8 text-center">
-              <div className="w-8 h-8 border-3 border-foreground border-t-transparent animate-spin mx-auto mb-4" />
-              <p className="text-sm text-muted-foreground">Loading reports...</p>
-            </div>
-          ) : completedSessions.length === 0 ? (
+          {completedSessions.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -146,7 +148,7 @@ export default function Reports() {
                         View
                       </button>
                       <button
-                        onClick={() => handleDownloadReport(session)}
+                        onClick={() => handleDownloadReport(session._id)}
                         className="nb-btn-primary px-4 py-2 bg-foreground text-background text-xs flex items-center gap-1.5"
                       >
                         <Download className="w-3.5 h-3.5" />

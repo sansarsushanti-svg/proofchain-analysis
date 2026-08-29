@@ -1,19 +1,18 @@
 import { useNavigate } from "react-router";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { getAllSessions } from "@/lib/sessionStore";
 import { AppNav } from "@/components/shared/AppNav";
 import { RiskBadge } from "@/components/shared/RiskBadge";
 import { motion } from "framer-motion";
 import { FileText, Plus, Clock, Eye } from "lucide-react";
 
 export default function History() {
-  const sessions = useQuery(api.analysisSessions.getSessionsByUser);
   const navigate = useNavigate();
 
-  const completedSessions = sessions?.filter((s) => s.status === "completed") || [];
-  const inProgressSessions = sessions?.filter(
+  const allSessions = getAllSessions();
+  const completedSessions = allSessions.filter((s) => s.status === "completed");
+  const inProgressSessions = allSessions.filter(
     (s) => s.status === "pending" || s.status === "analyzing"
-  ) || [];
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -86,12 +85,7 @@ export default function History() {
               Completed ({completedSessions.length})
             </h2>
 
-            {sessions === undefined ? (
-              <div className="nb-card p-8 text-center">
-                <div className="w-8 h-8 border-3 border-foreground border-t-transparent animate-spin mx-auto mb-4" />
-                <p className="text-sm text-muted-foreground">Loading history...</p>
-              </div>
-            ) : completedSessions.length === 0 ? (
+            {completedSessions.length === 0 ? (
               <div className="nb-card p-12 text-center">
                 <div className="w-16 h-16 bg-muted border-3 border-border flex items-center justify-center mx-auto mb-4">
                   <Clock className="w-8 h-8 text-muted-foreground" />

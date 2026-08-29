@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { getSession, updateSession, bulkInsertFindings } from "@/lib/sessionStore";
 import { AppNav } from "@/components/shared/AppNav";
 import { AnalysisProgress } from "@/components/forensic/AnalysisProgress";
 import { ANALYSIS_STAGES, type AnalysisStage } from "@/lib/forensics/types";
@@ -12,12 +11,6 @@ import { motion } from "framer-motion";
 export default function Analysis() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const session = useQuery(
-    api.analysisSessions.getSession,
-    sessionId ? { sessionId: sessionId as any } : "skip"
-  );
-  const updateSession = useMutation(api.analysisSessions.updateSessionStatus);
-  const bulkInsertFindings = useMutation(api.forensicFindings.bulkInsertFindings);
 
   const [stages, setStages] = useState<AnalysisStage[]>([...ANALYSIS_STAGES]);
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
@@ -46,13 +39,10 @@ export default function Analysis() {
 
   // Start analysis when session data is loaded
   useEffect(() => {
-    if (
-      !session ||
-      session.status !== "pending" ||
-      isRunning ||
-      analysisStarted.current
-    )
-      return;
+    if (!sessionId || isRunning || analysisStarted.current) return;
+
+    const session = getSession(sessionId);
+    if (!session || session.status !== "pending") return;
 
     analysisStarted.current = true;
 
@@ -61,7 +51,7 @@ export default function Analysis() {
         setIsRunning(true);
 
         // Update status to analyzing
-        await updateSession({ sessionId: session._id, status: "analyzing" });
+        updateSession(sessionId, { status: "analyzing" });
 
         // Run forensic analysis
         const result = await runForensicAnalysis(
@@ -76,21 +66,18 @@ export default function Analysis() {
           }
         );
 
-        // Insert findings into database
+        // Insert findings into local store
         if (result.findings.length > 0) {
-          await bulkInsertFindings({
-            sessionId: session._id,
-            findings: result.findings.map((f) => ({
-              category: f.category,
-              finding: f.finding,
-              severity: f.severity,
-              confidence: f.confidence,
-              evidence: f.evidence,
-              technicalExplanation: f.technicalExplanation,
-              userExplanation: f.userExplanation,
-              region: f.region,
-            })),
-          });
+          bulkInsertFindings(sessionId, result.findings.map((f) => ({
+            category: f.category,
+            finding: f.finding,
+            severity: f.severity,
+            confidence: f.confidence,
+            evidence: f.evidence,
+            technicalExplanation: f.technicalExplanation,
+            userExplanation: f.userExplanation,
+            region: f.region,
+          })));
         }
 
         // Generate AI explanation
@@ -103,8 +90,7 @@ export default function Analysis() {
         }
 
         // Update session with results
-        await updateSession({
-          sessionId: session._id,
+        updateSession(sessionId, {
           status: "completed",
           integrityScore: result.integrityScore,
           riskLevel: result.riskLevel,
@@ -112,7 +98,7 @@ export default function Analysis() {
         });
 
         // Navigate to results
-        navigate(`/results/${session._id}`);
+        navigate(`/results/${sessionId}`);
       } catch (err) {
         console.error("Analysis failed:", err);
         setError(
@@ -123,10 +109,7 @@ export default function Analysis() {
 
         // Update session to failed state
         try {
-          await updateSession({
-            sessionId: session._id,
-            status: "failed",
-          });
+          updateSession(sessionId, { status: "failed" });
         } catch {
           // Ignore update errors
         }
@@ -136,14 +119,7 @@ export default function Analysis() {
     };
 
     runAnalysis();
-  }, [
-    session,
-    isRunning,
-    updateSession,
-    bulkInsertFindings,
-    handleStageUpdate,
-    navigate,
-  ]);
+  }, [sessionId, isRunning, handleStageUpdate, navigate]);
 
   return (
     <div className="min-h-screen bg-background">

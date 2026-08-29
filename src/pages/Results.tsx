@@ -1,6 +1,5 @@
 import { useParams, useNavigate } from "react-router";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { getSession, getSessionFindings } from "@/lib/sessionStore";
 import { AppNav } from "@/components/shared/AppNav";
 import { IntegrityScore } from "@/components/forensic/IntegrityScore";
 import { CategorySummaryCard } from "@/components/forensic/CategorySummaryCard";
@@ -17,41 +16,58 @@ import { ArrowLeft, Download, FileText } from "lucide-react";
 export default function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const session = useQuery(
-    api.analysisSessions.getSession,
-    sessionId ? { sessionId: sessionId as any } : "skip"
-  );
-  const dbFindings = useQuery(
-    api.analysisSessions.getSessionFindings,
-    sessionId ? { sessionId: sessionId as any } : "skip"
-  );
 
-  if (session === undefined || dbFindings === undefined) {
+  if (!sessionId) {
     return (
       <div className="min-h-screen bg-background">
         <AppNav />
         <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-12 h-12 border-3 border-foreground border-t-transparent animate-spin mx-auto mb-4" />
-            <p className="text-sm text-muted-foreground uppercase tracking-wider font-bold">
-              Loading results...
-            </p>
+          <div className="nb-card p-8 text-center">
+            <p className="text-sm text-muted-foreground">No session specified.</p>
           </div>
         </main>
       </div>
     );
   }
 
-  if (!session || session.status !== "completed") {
+  const session = getSession(sessionId);
+  const dbFindings = getSessionFindings(sessionId);
+
+  if (!session) {
     return (
       <div className="min-h-screen bg-background">
         <AppNav />
         <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen flex items-center justify-center">
-          <div className="nb-card p-8 text-center max-w-md">            <h2 className="text-xl font-black uppercase tracking-wider mb-2">
+          <div className="nb-card p-8 text-center max-w-md">
+            <h2 className="text-xl font-black uppercase tracking-wider mb-2">
               Not Available
             </h2>
             <p className="text-sm text-muted-foreground mb-6">
-              {session?.status === "failed"
+              This session could not be found.
+            </p>
+            <button
+              onClick={() => navigate("/upload")}
+              className="nb-btn-primary px-6 py-3 bg-foreground text-background text-sm"
+            >
+              New Analysis
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (session.status !== "completed") {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppNav />
+        <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen flex items-center justify-center">
+          <div className="nb-card p-8 text-center max-w-md">
+            <h2 className="text-xl font-black uppercase tracking-wider mb-2">
+              Not Available
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              {session.status === "failed"
                 ? "This analysis failed to complete."
                 : "This session is still in progress or has not completed."}
             </p>

@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { AppNav } from "@/components/shared/AppNav";
 import { RiskBadge } from "@/components/shared/RiskBadge";
+import { getAllSessions } from "@/lib/sessionStore";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import {
@@ -12,42 +13,11 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-// Demo sessions for display purposes
-const DEMO_SESSIONS: Array<{
-  _id: string;
-  fileName: string;
-  fileType: string;
-  createdAt: string;
-  integrityScore: number;
-  riskLevel: "low" | "moderate" | "high" | "critical";
-  findingsCount: number;
-}> = [
-  {
-    _id: "demo-1",
-    fileName: "invoice_sample_clean.pdf",
-    fileType: "application/pdf",
-    createdAt: new Date().toISOString(),
-    integrityScore: 92,
-    riskLevel: "low",
-    findingsCount: 1,
-  },
-  {
-    _id: "demo-2",
-    fileName: "invoice_manipulated.jpg",
-    fileType: "image/jpeg",
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    integrityScore: 31,
-    riskLevel: "high",
-    findingsCount: 4,
-  },
-];
-
 export default function Dashboard() {
   const { user, isGuest } = useAuth();
   const navigate = useNavigate();
 
-  // Use demo sessions for now (Convex queries will be reconnected when Supabase data layer is set up)
-  const recentSessions = DEMO_SESSIONS;
+  const recentSessions = getAllSessions().sort((a, b) => b.createdAt - a.createdAt);
 
   const totalAnalyses = recentSessions.length;
   const highRisk = recentSessions.filter(

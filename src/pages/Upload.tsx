@@ -64,7 +64,7 @@ export default function Upload() {
     setIsAnalyzing(true);
     setError(null);
     try {
-      const sessionId = createSession({
+      const sessionId = await createSession({
         fileName: selectedFile.name,
         fileType: selectedFile.type,
         fileSize: selectedFile.size,

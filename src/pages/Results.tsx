@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { getSession, getSessionFindings } from "@/lib/sessionStore";
+import type { SessionData, FindingData } from "@/lib/sessionStore";
 import { AppNav } from "@/components/shared/AppNav";
 import { IntegrityScore } from "@/components/forensic/IntegrityScore";
 import { CategorySummaryCard } from "@/components/forensic/CategorySummaryCard";
@@ -9,13 +11,38 @@ import { AiExplanation } from "@/components/forensic/AiExplanation";
 import { getFindingsSummary } from "@/lib/forensics/scoring";
 import type { ForensicFinding } from "@/lib/forensics/types";
 import { downloadReport } from "@/lib/reportGenerator";
-import { generateAiExplanation, type AiExplanation as AiExplanationType } from "@/lib/ai";
+import {
+  generateAiExplanation,
+  type AiExplanation as AiExplanationType,
+} from "@/lib/ai";
 import { motion } from "framer-motion";
-import { ArrowLeft, Download, FileText } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 
 export default function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+
+  const [session, setSession] = useState<SessionData | null>(null);
+  const [dbFindings, setDbFindings] = useState<FindingData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setIsLoading(false);
+      return;
+    }
+
+    async function load() {
+      const [s, f] = await Promise.all([
+        getSession(sessionId!),
+        getSessionFindings(sessionId!),
+      ]);
+      setSession(s);
+      setDbFindings(f);
+      setIsLoading(false);
+    }
+    load();
+  }, [sessionId]);
 
   if (!sessionId) {
     return (
@@ -28,8 +55,16 @@ export default function Results() {
     );
   }
 
-  const session = getSession(sessionId);
-  const dbFindings = getSessionFindings(sessionId);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppNav />
+        <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-foreground border-t-transparent animate-spin" />
+        </main>
+      </div>
+    );
+  }
 
   if (!session) {
     return (
@@ -118,7 +153,11 @@ export default function Results() {
   const handleDownloadReport = () => {
     const result = {
       integrityScore: session.integrityScore || 0,
-      riskLevel: (session.riskLevel || "low") as "low" | "moderate" | "high" | "critical",
+      riskLevel: (session.riskLevel || "low") as
+        | "low"
+        | "moderate"
+        | "high"
+        | "critical",
       findings,
       metadata: {
         analysisTimestamp: new Date(session.createdAt).toISOString(),
@@ -157,7 +196,8 @@ export default function Results() {
                   Results
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {session.fileName} · {new Date(session.createdAt).toLocaleString()}
+                  {session.fileName} ·{" "}
+                  {new Date(session.createdAt).toLocaleString()}
                 </p>
               </div>
               <button

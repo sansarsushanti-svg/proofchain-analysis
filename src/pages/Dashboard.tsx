@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { AppNav } from "@/components/shared/AppNav";
 import { RiskBadge } from "@/components/shared/RiskBadge";
 import { getAllSessions } from "@/lib/sessionStore";
+import type { SessionData } from "@/lib/sessionStore";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import {
@@ -17,7 +19,15 @@ export default function Dashboard() {
   const { user, isGuest } = useAuth();
   const navigate = useNavigate();
 
-  const recentSessions = getAllSessions().sort((a, b) => b.createdAt - a.createdAt);
+  const [recentSessions, setRecentSessions] = useState<SessionData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    getAllSessions().then((sessions) => {
+      setRecentSessions(sessions.sort((a, b) => b.createdAt - a.createdAt));
+      setIsLoading(false);
+    });
+  }, []);
 
   const totalAnalyses = recentSessions.length;
   const highRisk = recentSessions.filter(
@@ -71,11 +81,18 @@ export default function Dashboard() {
               Dashboard
             </p>
             <h1 className="text-3xl font-black uppercase tracking-tight">
-              Welcome{user?.email ? `, ${user.email.split("@")[0]}` : isGuest ? ", Guest" : ""}
+              Welcome
+              {user?.email
+                ? `, ${user.email.split("@")[0]}`
+                : isGuest
+                  ? ", Guest"
+                  : ""}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               Overview of your forensic analysis sessions.
-              {isGuest ? " You are browsing as a guest — data will not be saved." : ""}
+              {isGuest
+                ? " You are browsing as a guest — data will not be saved."
+                : ""}
             </p>
           </motion.div>
 
@@ -129,7 +146,12 @@ export default function Dashboard() {
               Recent Analyses
             </h2>
 
-            {recentSessions.length === 0 ? (
+            {isLoading ? (
+              <div className="nb-card p-12 text-center">
+                <div className="w-8 h-8 border-2 border-foreground border-t-transparent animate-spin mx-auto mb-4" />
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              </div>
+            ) : recentSessions.length === 0 ? (
               <div className="nb-card p-12 text-center">
                 <div className="w-16 h-16 bg-muted border-3 border-border flex items-center justify-center mx-auto mb-4">
                   <Shield className="w-8 h-8 text-muted-foreground" />

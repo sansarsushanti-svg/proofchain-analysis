@@ -1,23 +1,37 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { getAllSessions, getSessionFindings } from "@/lib/sessionStore";
+import type { SessionData } from "@/lib/sessionStore";
 import { AppNav } from "@/components/shared/AppNav";
 import { RiskBadge } from "@/components/shared/RiskBadge";
 import { motion } from "framer-motion";
 import { FileText, Download, Plus } from "lucide-react";
 import type { ForensicFinding } from "@/lib/forensics/types";
-import { generateAiExplanation, type AiExplanation as AiExplanationType } from "@/lib/ai";
+import {
+  generateAiExplanation,
+  type AiExplanation as AiExplanationType,
+} from "@/lib/ai";
 import { downloadReport } from "@/lib/reportGenerator";
 
 export default function Reports() {
   const navigate = useNavigate();
-  const allSessions = getAllSessions();
+  const [allSessions, setAllSessions] = useState<SessionData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    getAllSessions().then((sessions) => {
+      setAllSessions(sessions);
+      setIsLoading(false);
+    });
+  }, []);
+
   const completedSessions = allSessions.filter((s) => s.status === "completed");
 
-  const handleDownloadReport = (sessionId: string) => {
+  const handleDownloadReport = async (sessionId: string) => {
     const session = allSessions.find((s) => s._id === sessionId);
     if (!session) return;
 
-    const dbFindings = getSessionFindings(sessionId);
+    const dbFindings = await getSessionFindings(sessionId);
     const findings: ForensicFinding[] = dbFindings.map((f) => ({
       category: f.category as ForensicFinding["category"],
       finding: f.finding,
@@ -38,7 +52,11 @@ export default function Reports() {
 
     const result = {
       integrityScore: session.integrityScore || 0,
-      riskLevel: (session.riskLevel || "low") as "low" | "moderate" | "high" | "critical",
+      riskLevel: (session.riskLevel || "low") as
+        | "low"
+        | "moderate"
+        | "high"
+        | "critical",
       findings,
       metadata: {
         analysisTimestamp: new Date(session.createdAt).toISOString(),
@@ -81,7 +99,12 @@ export default function Reports() {
             </button>
           </motion.div>
 
-          {completedSessions.length === 0 ? (
+          {isLoading ? (
+            <div className="nb-card p-12 text-center">
+              <div className="w-8 h-8 border-2 border-foreground border-t-transparent animate-spin mx-auto mb-4" />
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            </div>
+          ) : completedSessions.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}

@@ -1,7 +1,13 @@
 /**
- * Local session store — replaces Convex for session management.
- * Stores sessions in memory with localStorage persistence for the MVP.
+ * Session store — uses Supabase PostgreSQL for authenticated users
+ * and localStorage for guest mode.
+ *
+ * File data (base64) is always stored locally — never in PostgreSQL.
  */
+
+import { supabase, isConfigured } from "@/lib/supabase";
+
+// ── Types ─────────────────────────────────────────────────
 
 export interface SessionData {
   _id: string;
@@ -32,14 +38,53 @@ export interface FindingData {
   createdAt: number;
 }
 
+// ── localStorage helpers (used by both paths) ─────────────
+
 const STORAGE_KEY = "proofchain_sessions";
 const FINDINGS_KEY = "proofchain_findings";
+const FILE_DATA_KEY = "proofchain_file_data";
 
 function generateId(): string {
   return `s_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function loadSessions(): Record<string, SessionData> {
+function generateFindingId(): string {
+  return `f_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// File data is always stored in localStorage (even for authenticated users)
+// because Supabase PostgreSQL should not contain large base64 strings.
+function saveFileData(id: string, data: string) {
+  try {
+    const raw = localStorage.getItem(FILE_DATA_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    map[id] = data;
+    localStorage.setItem(FILE_DATA_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+function getFileData(id: string): string | null {
+  try {
+    const raw = localStorage.getItem(FILE_DATA_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    return map[id] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function removeFileData(id: string) {
+  try {
+    const raw = localStorage.getItem(FILE_DATA_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    delete map[id];
+    localStorage.setItem(FILE_DATA_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+// ── localStorage session helpers (guest mode) ─────────────
+
+function loadLocalSessions(): Record<string, SessionData> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : {};
@@ -48,15 +93,13 @@ function loadSessions(): Record<string, SessionData> {
   }
 }
 
-function saveSessions(sessions: Record<string, SessionData>) {
+function saveLocalSessions(sessions: Record<string, SessionData>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
-  } catch {
-    // localStorage full or unavailable — degrade gracefully
-  }
+  } catch {}
 }
 
-function loadFindings(): Record<string, FindingData[]> {
+function loadLocalFindings(): Record<string, FindingData[]> {
   try {
     const raw = localStorage.getItem(FINDINGS_KEY);
     return raw ? JSON.parse(raw) : {};
@@ -65,24 +108,89 @@ function loadFindings(): Record<string, FindingData[]> {
   }
 }
 
-function saveFindings(findings: Record<string, FindingData[]>) {
+function saveLocalFindings(findings: Record<string, FindingData[]>) {
   try {
     localStorage.setItem(FINDINGS_KEY, JSON.stringify(findings));
-  } catch {
-    // degrade gracefully
-  }
+  } catch {}
+}
+
+// ── Auth detection ────────────────────────────────────────
+
+async function getCurrentUserId(): Promise<string | null> {
+  if (!isConfigured) return null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.id ?? null;
+}
+
+// ── Supabase row mappers ──────────────────────────────────
+
+function rowToSession(
+  row: Record<string, unknown>,
+  fileDataFallback?: string | null,
+): SessionData {
+  return {
+    _id: row.id as string,
+    fileName: row.file_name as string,
+    fileType: row.file_type as string,
+    fileSize: row.file_size as number,
+    fileData: fileDataFallback ?? "",
+    status: row.status as SessionData["status"],
+    integrityScore: row.integrity_score as number | undefined,
+    riskLevel: row.risk_level as SessionData["riskLevel"],
+    aiExplanation: row.ai_explanation as string | undefined,
+    createdAt: new Date(row.created_at as string).getTime(),
+    completedAt: row.completed_at
+      ? new Date(row.completed_at as string).getTime()
+      : undefined,
+    isDemo: row.is_demo as boolean | undefined,
+  };
 }
 
 // ── Public API ────────────────────────────────────────────
 
-export function createSession(data: {
+/**
+ * Create a new analysis session.
+ * Returns the session ID.
+ */
+export async function createSession(data: {
   fileName: string;
   fileType: string;
   fileSize: number;
   fileData: string;
   isDemo?: boolean;
-}): string {
-  const sessions = loadSessions();
+}): Promise<string> {
+  const userId = await getCurrentUserId();
+
+  if (userId) {
+    // Authenticated: write to Supabase
+    const { data: row, error } = await supabase
+      .from("analysis_sessions")
+      .insert({
+        user_id: userId,
+        file_name: data.fileName,
+        file_type: data.fileType,
+        file_size: data.fileSize,
+        status: "pending",
+        is_demo: data.isDemo ?? false,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("Failed to create session in Supabase:", error);
+      throw new Error("Failed to create analysis session.");
+    }
+
+    const id = row.id as string;
+    // Store file data locally (not in PostgreSQL)
+    saveFileData(id, data.fileData);
+    return id;
+  }
+
+  // Guest: write to localStorage
+  const sessions = loadLocalSessions();
   const id = generateId();
   sessions[id] = {
     _id: id,
@@ -94,48 +202,187 @@ export function createSession(data: {
     createdAt: Date.now(),
     isDemo: data.isDemo,
   };
-  saveSessions(sessions);
+  saveLocalSessions(sessions);
   return id;
 }
 
-export function getSession(sessionId: string): SessionData | null {
-  const sessions = loadSessions();
+/**
+ * Get a single session by ID.
+ */
+export async function getSession(
+  sessionId: string,
+): Promise<SessionData | null> {
+  const userId = await getCurrentUserId();
+
+  if (userId) {
+    const { data: row, error } = await supabase
+      .from("analysis_sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .single();
+
+    if (error || !row) return null;
+
+    // File data is always in localStorage
+    const fileData = getFileData(sessionId) ?? "";
+    return rowToSession(row, fileData);
+  }
+
+  // Guest
+  const sessions = loadLocalSessions();
   return sessions[sessionId] ?? null;
 }
 
-export function updateSession(
+/**
+ * Update a session with partial data.
+ */
+export async function updateSession(
   sessionId: string,
-  updates: Partial<Omit<SessionData, "_id" | "createdAt">>
-): void {
-  const sessions = loadSessions();
+  updates: Partial<Omit<SessionData, "_id" | "createdAt">>,
+): Promise<void> {
+  const userId = await getCurrentUserId();
+
+  if (userId) {
+    // Build Supabase update payload
+    const dbUpdates: Record<string, unknown> = {};
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.integrityScore !== undefined)
+      dbUpdates.integrity_score = updates.integrityScore;
+    if (updates.riskLevel !== undefined) dbUpdates.risk_level = updates.riskLevel;
+    if (updates.aiExplanation !== undefined)
+      dbUpdates.ai_explanation = updates.aiExplanation;
+    if (updates.completedAt !== undefined)
+      dbUpdates.completed_at = new Date(updates.completedAt).toISOString();
+    if (updates.isDemo !== undefined) dbUpdates.is_demo = updates.isDemo;
+
+    if (Object.keys(dbUpdates).length > 0) {
+      const { error } = await supabase
+        .from("analysis_sessions")
+        .update(dbUpdates)
+        .eq("id", sessionId);
+
+      if (error) {
+        console.error("Failed to update session in Supabase:", error);
+      }
+    }
+
+    // If fileData is being updated, save locally
+    if (updates.fileData !== undefined) {
+      saveFileData(sessionId, updates.fileData);
+    }
+    return;
+  }
+
+  // Guest
+  const sessions = loadLocalSessions();
   const existing = sessions[sessionId];
   if (!existing) return;
   sessions[sessionId] = { ...existing, ...updates };
-  saveSessions(sessions);
+  saveLocalSessions(sessions);
 }
 
-export function bulkInsertFindings(
+/**
+ * Insert multiple findings for a session.
+ */
+export async function bulkInsertFindings(
   sessionId: string,
-  findings: Omit<FindingData, "_id" | "sessionId" | "createdAt">[]
-): void {
-  const allFindings = loadFindings();
+  findings: Omit<FindingData, "_id" | "sessionId" | "createdAt">[],
+): Promise<void> {
+  const userId = await getCurrentUserId();
+
+  if (userId) {
+    const rows = findings.map((f) => ({
+      analysis_id: sessionId,
+      category: f.category,
+      finding: f.finding,
+      severity: f.severity,
+      confidence: f.confidence,
+      evidence: f.evidence,
+      technical_explanation: f.technicalExplanation,
+      user_explanation: f.userExplanation,
+      region: f.region ?? null,
+    }));
+
+    const { error } = await supabase.from("forensic_findings").insert(rows);
+
+    if (error) {
+      console.error("Failed to insert findings in Supabase:", error);
+    }
+    return;
+  }
+
+  // Guest
+  const allFindings = loadLocalFindings();
   if (!allFindings[sessionId]) allFindings[sessionId] = [];
   for (const f of findings) {
     allFindings[sessionId].push({
       ...f,
-      _id: `f_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      _id: generateFindingId(),
       sessionId,
       createdAt: Date.now(),
     });
   }
-  saveFindings(allFindings);
+  saveLocalFindings(allFindings);
 }
 
-export function getSessionFindings(sessionId: string): FindingData[] {
-  const allFindings = loadFindings();
+/**
+ * Get all findings for a session.
+ */
+export async function getSessionFindings(
+  sessionId: string,
+): Promise<FindingData[]> {
+  const userId = await getCurrentUserId();
+
+  if (userId) {
+    const { data: rows, error } = await supabase
+      .from("forensic_findings")
+      .select("*")
+      .eq("analysis_id", sessionId)
+      .order("created_at", { ascending: true });
+
+    if (error || !rows) return [];
+
+    return rows.map((row) => ({
+      _id: row.id as string,
+      sessionId: row.analysis_id as string,
+      category: row.category as string,
+      finding: row.finding as string,
+      severity: row.severity as FindingData["severity"],
+      confidence: row.confidence as number,
+      evidence: row.evidence as string,
+      technicalExplanation: row.technical_explanation as string,
+      userExplanation: row.user_explanation as string,
+      region: (row.region as FindingData["region"]) ?? undefined,
+      createdAt: new Date(row.created_at as string).getTime(),
+    }));
+  }
+
+  // Guest
+  const allFindings = loadLocalFindings();
   return allFindings[sessionId] ?? [];
 }
 
-export function getAllSessions(): SessionData[] {
-  return Object.values(loadSessions());
+/**
+ * Get all sessions for the current user/guest.
+ */
+export async function getAllSessions(): Promise<SessionData[]> {
+  const userId = await getCurrentUserId();
+
+  if (userId) {
+    const { data: rows, error } = await supabase
+      .from("analysis_sessions")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error || !rows) return [];
+
+    return rows.map((row) => {
+      const fileData = getFileData(row.id as string) ?? "";
+      return rowToSession(row, fileData);
+    });
+  }
+
+  // Guest
+  return Object.values(loadLocalSessions());
 }

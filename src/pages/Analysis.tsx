@@ -34,21 +34,24 @@ export default function Analysis() {
         return idx;
       });
     },
-    [stages]
+    [stages],
   );
 
   useEffect(() => {
     if (!sessionId || isRunning || analysisStarted.current) return;
 
-    const session = getSession(sessionId);
-    if (!session || session.status !== "pending") return;
-
-    analysisStarted.current = true;
+    let cancelled = false;
 
     const runAnalysis = async () => {
+      const session = await getSession(sessionId);
+      if (!session || session.status !== "pending") return;
+      if (cancelled) return;
+
+      analysisStarted.current = true;
+
       try {
         setIsRunning(true);
-        updateSession(sessionId, { status: "analyzing" });
+        await updateSession(sessionId, { status: "analyzing" });
 
         const result = await runForensicAnalysis(
           {
@@ -57,11 +60,13 @@ export default function Analysis() {
             size: session.fileSize,
             dataUrl: session.fileData,
           },
-          { onStageUpdate: handleStageUpdate }
+          { onStageUpdate: handleStageUpdate },
         );
 
+        if (cancelled) return;
+
         if (result.findings.length > 0) {
-          bulkInsertFindings(
+          await bulkInsertFindings(
             sessionId,
             result.findings.map((f) => ({
               category: f.category,
@@ -72,7 +77,7 @@ export default function Analysis() {
               technicalExplanation: f.technicalExplanation,
               userExplanation: f.userExplanation,
               region: f.region,
-            }))
+            })),
           );
         }
 
@@ -84,7 +89,9 @@ export default function Analysis() {
           // continue without AI
         }
 
-        updateSession(sessionId, {
+        if (cancelled) return;
+
+        await updateSession(sessionId, {
           status: "completed",
           integrityScore: result.integrityScore,
           riskLevel: result.riskLevel,
@@ -94,19 +101,24 @@ export default function Analysis() {
         navigate(`/results/${sessionId}`);
       } catch (err) {
         console.error("Analysis failed:", err);
+        if (cancelled) return;
         setError(
           err instanceof Error
             ? err.message
-            : "Analysis failed. Please try again."
+            : "Analysis failed. Please try again.",
         );
         try {
-          updateSession(sessionId, { status: "failed" });
+          await updateSession(sessionId, { status: "failed" });
         } catch {}
         setIsRunning(false);
       }
     };
 
     runAnalysis();
+
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId, isRunning, handleStageUpdate, navigate]);
 
   return (
@@ -140,7 +152,10 @@ export default function Analysis() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <AnalysisProgress stages={stages} currentStageIndex={currentStageIndex} />
+              <AnalysisProgress
+                stages={stages}
+                currentStageIndex={currentStageIndex}
+              />
 
               <div className="mt-8 text-center">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider">

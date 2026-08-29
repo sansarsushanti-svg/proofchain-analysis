@@ -34,6 +34,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const {
     isLoading: authLoading,
     isAuthenticated,
+    isGuest,
     signIn,
     signUp,
     continueAsGuest,
@@ -52,10 +53,12 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
+    // Only auto-redirect for real Supabase sessions, not guest mode.
+    // Guest users should see the auth page and explicitly choose Continue as Guest.
+    if (!authLoading && isAuthenticated && !isGuest) {
       navigate(redirect);
     }
-  }, [authLoading, isAuthenticated, navigate, redirect]);
+  }, [authLoading, isAuthenticated, isGuest, navigate, redirect]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

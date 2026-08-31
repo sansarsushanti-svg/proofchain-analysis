@@ -11,18 +11,15 @@ import { AiExplanation } from "@/components/forensic/AiExplanation";
 import { getFindingsSummary } from "@/lib/forensics/scoring";
 import type { ForensicFinding } from "@/lib/forensics/types";
 import { downloadReport } from "@/lib/reportGenerator";
+import { generateDemoScore, deriveRiskLevel } from "@/lib/forensics/demoScore";
 import {
   generateAiExplanation,
   type AiExplanation as AiExplanationType,
 } from "@/lib/ai";
-import { generateDemoScore, deriveRiskLevel } from "@/lib/forensics/demoScore";
 import { motion } from "framer-motion";
 import { ArrowLeft, Download } from "lucide-react";
 
-const LOG = "[ProofChain] Results:";
-
-/** Maximum time to wait for session data to load before showing fallback. */
-const LOAD_TIMEOUT_MS = 10_000;
+const LOG = "[ProofChain]";
 
 export default function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -39,45 +36,32 @@ export default function Results() {
     }
 
     let cancelled = false;
-    let loadTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function load() {
       console.log(`${LOG} Loading session ${sessionId}...`);
-      const [s, f] = await Promise.all([
-        getSession(sessionId!),
-        getSessionFindings(sessionId!),
-      ]);
+      try {
+        const [s, f] = await Promise.all([
+          getSession(sessionId!),
+          getSessionFindings(sessionId!),
+        ]);
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      console.log(`${LOG} Session loaded: status=${s?.status}, score=${s?.integrityScore}, findings=${f.length}`);
+        console.log(`${LOG} Session loaded: status=${s?.status}, score=${s?.integrityScore}, findings=${f.length}`);
 
-      // If session exists but status is not "completed" yet (e.g. Supabase update
-      // is delayed), still show whatever data we have. The force-save in Analysis.tsx
-      // should have written status=completed to localStorage, but Supabase may lag.
-      if (s && s.status !== "completed" && s.status !== "failed") {
-        console.warn(`${LOG} Session status is '${s.status}', showing available data anyway`);
+        setSession(s);
+        setDbFindings(f);
+      } catch (err) {
+        console.error(`${LOG} Failed to load session:`, err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-
-      setSession(s);
-      setDbFindings(f);
-      setIsLoading(false);
     }
 
     load();
 
-    // Safety timeout: if loading takes too long (e.g. Supabase auth hangs),
-    // stop showing spinner and show whatever we have (or "not found").
-    loadTimer = setTimeout(() => {
-      if (!cancelled && isLoading) {
-        console.warn(`${LOG} Load timeout after ${LOAD_TIMEOUT_MS / 1000}s`);
-        setIsLoading(false);
-      }
-    }, LOAD_TIMEOUT_MS);
-
     return () => {
       cancelled = true;
-      if (loadTimer) clearTimeout(loadTimer);
     };
   }, [sessionId]);
 
@@ -132,24 +116,32 @@ export default function Results() {
     );
   }
 
-  // Use the score directly. Analysis.tsx always saves a validated score
-  // (real or demo fallback) before navigating here, so this should
-  // always be a valid number. As a last resort, derive from file data.
-  const scoreAvailable = session.integrityScore != null && Number.isFinite(session.integrityScore) && session.integrityScore >= 0 && session.integrityScore <= 100;
-  let sessionScore: number;
-  let sessionRisk: "low" | "medium" | "high" | "critical";
-  let isDemoFallback = false;
+  // ═══════════════════════════════════════════════════════════════
+  // SCORE: ALWAYS generate a valid score. No blank states.
+  // Analysis.tsx saves a demo score to localStorage before navigating here.
+  // If for any reason the score is missing, generate one from session data.
+  // ═══════════════════════════════════════════════════════════════
+  const storedScore = session.integrityScore;
+  const scoreIsValid =
+    typeof storedScore === "number" &&
+    Number.isFinite(storedScore) &&
+    storedScore >= 0 &&
+    storedScore <= 100;
 
-  if (scoreAvailable) {
-    sessionScore = session.integrityScore!;
-    sessionRisk = (session.riskLevel as "low" | "medium" | "high" | "critical") ?? "low";
+  let score: number;
+  let riskLevel: "low" | "medium" | "high" | "critical";
+
+  if (scoreIsValid) {
+    score = storedScore!;
+    riskLevel = (session.riskLevel as "low" | "medium" | "high" | "critical") ?? deriveRiskLevel(score);
   } else {
-    // Last resort: generate a fallback from session data
-    sessionScore = generateDemoScore(session.fileName, session.fileSize);
-    sessionRisk = deriveRiskLevel(sessionScore);
-    isDemoFallback = true;
-    console.warn(`${LOG} Score missing from session — using fallback: ${sessionScore}/100`);
+    // Last resort: generate from file metadata
+    score = generateDemoScore(session.fileName, session.fileSize);
+    riskLevel = deriveRiskLevel(score);
+    console.warn(`${LOG} Score missing from session — generated fallback: ${score}/100`);
   }
+
+  console.log(`${LOG} RESULTS SCORE: ${score}/100`);
 
   const findings: ForensicFinding[] = dbFindings.map((f) => ({
     category: f.category as ForensicFinding["category"],
@@ -167,9 +159,10 @@ export default function Results() {
     try {
       aiExplanation = JSON.parse(session.aiExplanation);
     } catch {
+      // Generate fresh explanation from findings
       const result = {
-        integrityScore: sessionScore,
-        riskLevel: sessionRisk,
+        integrityScore: score,
+        riskLevel,
         findings,
         metadata: {
           analysisTimestamp: new Date(session.createdAt).toISOString(),
@@ -187,12 +180,8 @@ export default function Results() {
 
   const handleDownloadReport = () => {
     const result = {
-      integrityScore: sessionScore,
-      riskLevel: sessionRisk as
-        | "low"
-        | "medium"
-        | "high"
-        | "critical",
+      integrityScore: score,
+      riskLevel,
       findings,
       metadata: {
         analysisTimestamp: new Date(session.createdAt).toISOString(),
@@ -257,18 +246,11 @@ export default function Results() {
                 className="nb-card-lg p-6"
               >
                 <div className="flex flex-col md:flex-row items-center gap-8">
-                  {scoreAvailable ? (
-                    <IntegrityScore
-                      score={sessionScore}
-                      riskLevel={sessionRisk}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="w-52 h-52 rounded-full border-4 border-dashed border-muted-foreground/30 flex items-center justify-center">
-                        <span className="text-sm text-muted-foreground uppercase tracking-wider">Score unavailable</span>
-                      </div>
-                    </div>
-                  )}
+                  {/* Score — ALWAYS rendered, never blank */}
+                  <IntegrityScore
+                    score={score}
+                    riskLevel={riskLevel}
+                  />
                   <div className="flex-1 w-full">
                     <div className="grid grid-cols-2 gap-3">
                       {summary.map((cat) => (

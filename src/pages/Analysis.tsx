@@ -13,6 +13,95 @@ const LOG = "[ProofChain]";
 /** Safety timeout: if analysis takes longer than this, show an error. */
 const SAFETY_TIMEOUT_MS = 120_000; // 2 minutes
 
+/** Maximum time allowed for any persistence operation. */
+const PERSISTENCE_TIMEOUT_MS = 5_000; // 5 seconds
+
+/** Wrap any promise with a deadline. Resolves with fallback on timeout. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) =>
+      setTimeout(() => {
+        console.warn(`${LOG} ${label} timed out after ${ms / 1000}s`);
+        resolve(fallback);
+      }, ms)
+    ),
+  ]);
+}
+
+/**
+ * Force-write session and findings to localStorage as a safety net.
+ * This ensures the Results page can always load data, even if
+ * Supabase persistence fails or times out.
+ */
+function forceSaveToLocalStorage(
+  sessionId: string,
+  session: {
+    fileName: string;
+    fileType: string;
+    fileSize: number;
+    fileData: string;
+    status: "completed" | "failed";
+    integrityScore?: number;
+    riskLevel?: string;
+    aiExplanation?: string;
+  },
+  findings: Array<{
+    category: string;
+    finding: string;
+    severity: string;
+    confidence: number;
+    evidence: string;
+    technicalExplanation: string;
+    userExplanation: string;
+    region?: { x: number; y: number; width: number; height: number };
+  }>,
+) {
+  try {
+    const STORAGE_KEY = "proofchain_sessions";
+    const FINDINGS_KEY = "proofchain_findings";
+    const FILE_DATA_KEY = "proofchain_file_data";
+
+    // Save session
+    const rawSessions = localStorage.getItem(STORAGE_KEY);
+    const sessions = rawSessions ? JSON.parse(rawSessions) : {};
+    sessions[sessionId] = {
+      _id: sessionId,
+      ...session,
+      createdAt: sessions[sessionId]?.createdAt ?? Date.now(),
+      completedAt: Date.now(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+
+    // Save file data if not already stored
+    if (session.fileData) {
+      const rawFiles = localStorage.getItem(FILE_DATA_KEY);
+      const files = rawFiles ? JSON.parse(rawFiles) : {};
+      if (!files[sessionId]) {
+        files[sessionId] = session.fileData;
+        localStorage.setItem(FILE_DATA_KEY, JSON.stringify(files));
+      }
+    }
+
+    // Save findings
+    const rawFindings = localStorage.getItem(FINDINGS_KEY);
+    const allFindings = rawFindings ? JSON.parse(rawFindings) : {};
+    if (!allFindings[sessionId]) {
+      allFindings[sessionId] = findings.map((f) => ({
+        ...f,
+        _id: `f_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        sessionId,
+        createdAt: Date.now(),
+      }));
+      localStorage.setItem(FINDINGS_KEY, JSON.stringify(allFindings));
+    }
+
+    console.log(`${LOG} Force-saved session + findings to localStorage`);
+  } catch (err) {
+    console.error(`${LOG} Failed to force-save to localStorage:`, err);
+  }
+}
+
 export default function Analysis() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
@@ -86,40 +175,29 @@ export default function Analysis() {
           { onStageUpdate: handleStageUpdate },
         );
 
-        console.log(`${LOG} Engine resolved. Score: ${result.integrityScore}, Findings: ${result.findings.length}`);
+        console.log(`${LOG} ENGINE COMPLETE`);
+        console.log(`${LOG} SCORE: ${result.integrityScore}`);
+        console.log(`${LOG} FINDINGS: ${result.findings.length}`);
 
         if (cancelled) {
           console.log(`${LOG} Cancelled after engine resolve, not saving`);
           return;
         }
 
-        // Save findings
-        console.log(`${LOG} Saving ${result.findings.length} finding(s)...`);
-        try {
-          if (result.findings.length > 0) {
-            await bulkInsertFindings(
-              sessionId,
-              result.findings.map((f) => ({
-                category: f.category,
-                finding: f.finding,
-                severity: f.severity,
-                confidence: f.confidence,
-                evidence: f.evidence,
-                technicalExplanation: f.technicalExplanation,
-                userExplanation: f.userExplanation,
-                region: f.region,
-              })),
-            );
-          }
-          console.log(`${LOG} Findings saved successfully`);
-        } catch (findingsErr) {
-          console.error(`${LOG} Failed to save findings:`, findingsErr);
-          // Non-fatal: continue to update session and navigate
-        }
+        // ── Step 1: Force-save to localStorage immediately ──
+        // This guarantees the Results page can load data regardless
+        // of what happens with Supabase or async persistence.
+        const findingsPayload = result.findings.map((f) => ({
+          category: f.category,
+          finding: f.finding,
+          severity: f.severity,
+          confidence: f.confidence,
+          evidence: f.evidence,
+          technicalExplanation: f.technicalExplanation,
+          userExplanation: f.userExplanation,
+          region: f.region,
+        }));
 
-        if (cancelled) return;
-
-        // Generate AI explanation
         let aiExplanation = "";
         try {
           const explanation = generateAiExplanation(result);
@@ -129,39 +207,81 @@ export default function Analysis() {
           console.error(`${LOG} AI explanation failed:`, aiErr);
         }
 
-        // Update session with results
-        console.log(`${LOG} Updating session with results...`);
-        try {
-          await updateSession(sessionId, {
+        forceSaveToLocalStorage(
+          sessionId,
+          {
+            fileName: session.fileName,
+            fileType: session.fileType,
+            fileSize: session.fileSize,
+            fileData: session.fileData,
             status: "completed",
             integrityScore: result.integrityScore,
             riskLevel: result.riskLevel,
             aiExplanation,
-          });
-          console.log(`${LOG} Session updated to completed`);
-        } catch (sessionErr) {
-          console.error(`${LOG} Failed to update session:`, sessionErr);
-          // Non-fatal: try to navigate anyway
+          },
+          findingsPayload,
+        );
+
+        // ── Step 2: Attempt async persistence (non-blocking, with timeout) ──
+        console.log(`${LOG} Persisting to database (with ${PERSISTENCE_TIMEOUT_MS / 1000}s timeout)...`);
+        try {
+          const persistResult = await withTimeout(
+            (async () => {
+              if (findingsPayload.length > 0) {
+                await bulkInsertFindings(sessionId, findingsPayload);
+              }
+              await updateSession(sessionId, {
+                status: "completed",
+                integrityScore: result.integrityScore,
+                riskLevel: result.riskLevel,
+                aiExplanation,
+              });
+              return true as const;
+            })(),
+            PERSISTENCE_TIMEOUT_MS,
+            "Persistence",
+            false,
+          );
+
+          if (persistResult) {
+            console.log(`${LOG} PERSISTENCE COMPLETE`);
+          } else {
+            console.warn(`${LOG} PERSISTENCE TIMED OUT — using localStorage fallback`);
+          }
+        } catch (persistErr) {
+          console.error(`${LOG} PERSISTENCE FAILED:`, persistErr);
         }
 
+        // ── Step 3: Navigate — ALWAYS, regardless of persistence ──
         if (cancelled) return;
 
-        // Navigate to results
         const resultsUrl = `/results/${sessionId}`;
-        console.log(`${LOG} Navigating to ${resultsUrl}`);
+        console.log(`${LOG} NAVIGATING TO ${resultsUrl}`);
         navigate(resultsUrl);
-        console.log(`${LOG} Navigation called`);
+        console.log(`${LOG} ANALYSIS FINISHED`);
       } catch (err) {
         console.error(`${LOG} Analysis pipeline failed:`, err);
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : "Analysis failed. Please try again.";
         setError(msg);
         try {
-          await updateSession(sessionId, { status: "failed" });
+          await withTimeout(
+            updateSession(sessionId, { status: "failed" }),
+            PERSISTENCE_TIMEOUT_MS,
+            "Failed-status update",
+            undefined,
+          );
         } catch {}
         setIsRunning(false);
       } finally {
-        if (safetyTimer) clearTimeout(safetyTimer);
+        if (safetyTimer) {
+          clearTimeout(safetyTimer);
+          safetyTimer = null;
+        }
+        // Ensure isRunning is cleared if navigation didn't unmount us
+        if (!cancelled) {
+          setIsRunning(false);
+        }
       }
     };
 

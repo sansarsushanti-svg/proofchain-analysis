@@ -29,7 +29,7 @@ export interface FindingData {
   sessionId: string;
   category: string;
   finding: string;
-  severity: "low" | "medium" | "high";
+  severity: "low" | "medium" | "high" | "critical";
   confidence: number;
   evidence: string;
   technicalExplanation: string;

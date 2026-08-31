@@ -135,7 +135,8 @@ export default function Results() {
   // The force-save in Analysis.tsx writes status=completed to localStorage,
   // but Supabase may still show "analyzing" if the update timed out.
   // We show results as long as we have a session with data.
-  const sessionScore = session.integrityScore ?? 100;
+  const scoreAvailable = session.integrityScore != null && Number.isFinite(session.integrityScore);
+  const sessionScore = scoreAvailable ? session.integrityScore! : 0;
   const sessionRisk = session.riskLevel ?? "low";
 
   const findings: ForensicFinding[] = dbFindings.map((f) => ({
@@ -244,10 +245,18 @@ export default function Results() {
                 className="nb-card-lg p-6"
               >
                 <div className="flex flex-col md:flex-row items-center gap-8">
-                  <IntegrityScore
-                    score={sessionScore}
-                    riskLevel={sessionRisk}
-                  />
+                  {scoreAvailable ? (
+                    <IntegrityScore
+                      score={sessionScore}
+                      riskLevel={sessionRisk}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-52 h-52 rounded-full border-4 border-dashed border-muted-foreground/30 flex items-center justify-center">
+                        <span className="text-sm text-muted-foreground uppercase tracking-wider">Score unavailable</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex-1 w-full">
                     <div className="grid grid-cols-2 gap-3">
                       {summary.map((cat) => (

@@ -1,7 +1,7 @@
 export interface ForensicFinding {
   category: "metadata" | "image_forensics" | "text_layout" | "pdf_structure" | "invoice_analysis" | "text_image_correlation";
   finding: string;
-  severity: "low" | "medium" | "high";
+  severity: "low" | "medium" | "high" | "critical";
   confidence: number; // 0-100
   evidence: string;
   technicalExplanation: string;

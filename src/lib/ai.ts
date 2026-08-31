@@ -35,11 +35,11 @@ export function generateAiExplanation(
   if (highSeverityFindings.length > 0) {
     executiveSummary = `The analysis identified ${highSeverityFindings.length} high-confidence anomaly indicators that are consistent with possible document manipulation. `;
     if (mediumSeverityFindings.length > 0) {
-      executiveSummary += `An additional ${mediumSeverityFindings.length} moderate indicators were detected. `;
+      executiveSummary += `An additional ${mediumSeverityFindings.length} medium-severity indicators were detected. `;
     }
     executiveSummary += `These findings warrant further investigation by qualified personnel.`;
   } else if (mediumSeverityFindings.length > 0) {
-    executiveSummary = `The analysis detected ${mediumSeverityFindings.length} moderate-confidence indicators that may suggest document modification. `;
+    executiveSummary = `The analysis detected ${mediumSeverityFindings.length} medium-severity indicators that may suggest document modification. `;
     executiveSummary += `While not conclusive evidence of manipulation, these anomalies should be reviewed.`;
   } else {
     executiveSummary = `The forensic analysis did not detect significant indicators of manipulation. `;

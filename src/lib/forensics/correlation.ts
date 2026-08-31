@@ -94,8 +94,8 @@ export function correlateEvidence(
         correlatedFindings.push({
           category: "text_image_correlation",
           finding: `Currency amount ${amount.originalText} located within an image-anomalous region`,
-          severity: "high",
-          confidence: Math.min(90, Math.round((amount.confidence + finding.confidence) / 2)),
+          severity: "critical",
+          confidence: Math.min(95, Math.round((amount.confidence + finding.confidence) / 2)),
           evidence: `Image-level statistical anomaly (${finding.finding}) overlaps the OCR-detected amount "${amount.originalText}" at coordinates (${Math.round(amount.bbox.x0)}, ${Math.round(amount.bbox.y0)}). The amount was identified with ${amount.confidence.toFixed(0)}% OCR confidence.`,
           technicalExplanation: `Cross-referencing image forensics and OCR revealed that the currency amount ${amount.originalText} (OCR confidence: ${amount.confidence.toFixed(0)}%) is located within a region flagged by image analysis as exhibiting anomalous characteristics (${finding.technicalExplanation}). This spatial correlation indicates the region containing this financial value may have been modified.`,
           userExplanation: `The amount ${amount.originalText} is located in a part of the image that shows signs of possible alteration. This is a significant indicator that warrants verification of this specific value against the original document.`,

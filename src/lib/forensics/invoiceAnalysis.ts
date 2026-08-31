@@ -88,7 +88,45 @@ export function extractCurrencyAmounts(
   const amounts: CurrencyAmount[] = [];
   const seen = new Set<string>();
 
-  for (const word of words) {
+  // Step 1: Merge fragmented OCR tokens (e.g. "Rs." + "18,500" on same line)
+  const mergedWords: OcrWord[] = [];
+  const usedIndices = new Set<number>();
+
+  for (let i = 0; i < words.length; i++) {
+    if (usedIndices.has(i)) continue;
+    const w = words[i];
+
+    // Check if this word is a currency prefix (Rs. / Rs / ₹)
+    const isPrefix = /^(?:Rs\.?|₹)$/i.test(w.text.trim());
+    if (isPrefix && i + 1 < words.length) {
+      const next = words[i + 1];
+      // Check if next word is a number-like token
+      const isNumber = /^\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?$/.test(next.text.trim());
+      // Also check for same-line proximity
+      const sameLine = Math.abs(w.bbox.y0 - next.bbox.y0) < 15;
+
+      if (isNumber && sameLine) {
+        // Merge: combine the prefix and number
+        mergedWords.push({
+          text: `${w.text.trim()}${next.text.trim()}`,
+          confidence: Math.min(w.confidence, next.confidence),
+          bbox: {
+            x0: w.bbox.x0,
+            y0: Math.min(w.bbox.y0, next.bbox.y0),
+            x1: next.bbox.x1,
+            y1: Math.max(w.bbox.y1, next.bbox.y1),
+          },
+        });
+        usedIndices.add(i);
+        usedIndices.add(i + 1);
+        continue;
+      }
+    }
+    mergedWords.push(w);
+  }
+
+  // Step 2: Extract currency amounts from (possibly merged) words
+  for (const word of mergedWords) {
     const matches = word.text.match(CURRENCY_REGEX);
     if (!matches) continue;
 
@@ -113,7 +151,7 @@ export function extractCurrencyAmounts(
 
   // Infer roles based on context
   for (const amount of amounts) {
-    amount.role = inferRole(amount, words);
+    amount.role = inferRole(amount, mergedWords);
   }
 
   return amounts;

@@ -83,7 +83,7 @@ export function generateAiExplanation(
   let plainEnglish = "";
   if (result.riskLevel === "high" || result.riskLevel === "critical") {
     plainEnglish = "Based on the forensic evidence collected, this document shows multiple indicators that are commonly associated with altered or manipulated files. The analysis detected inconsistencies across different parts of the file that may suggest it was modified after its original creation. This does not constitute proof of fraud, but it does indicate that the file should be verified through other means.";
-  } else if (result.riskLevel === "moderate") {
+  } else if (result.riskLevel === "medium") {
     plainEnglish = "The analysis found some indicators that could suggest the document was modified. While none of these indicators alone would be considered conclusive evidence, their combination warrants a closer look. We recommend verifying the document against its original version or obtaining additional verification.";
   } else {
     plainEnglish = "The document appears to have consistent characteristics across all forensic checks. No significant anomalies were detected. However, automated analysis has inherent limitations and should be supplemented with other verification methods for high-stakes decisions.";
@@ -93,7 +93,7 @@ export function generateAiExplanation(
   let recommendedNextStep = "";
   if (result.riskLevel === "high" || result.riskLevel === "critical") {
     recommendedNextStep = "We recommend: (1) Obtaining the original document for comparison, (2) Verifying the document through the issuing organization directly, (3) Consulting with a digital forensics professional for a detailed manual examination, (4) Considering this document as potentially unreliable until further verification is complete.";
-  } else if (result.riskLevel === "moderate") {
+  } else if (result.riskLevel === "medium") {
     recommendedNextStep = "We recommend: (1) Verifying the document with the issuing party, (2) Comparing against known authentic versions if available, (3) For high-value transactions, requesting additional verification documents.";
   } else {
     recommendedNextStep = "The automated analysis suggests this document is consistent with its expected format. For important decisions, we still recommend: (1) Verifying key details with the issuing party, (2) Keeping this analysis report for your records.";

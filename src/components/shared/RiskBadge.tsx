@@ -1,14 +1,14 @@
 import { cn } from "@/lib/utils";
 
 interface RiskBadgeProps {
-  level: "low" | "moderate" | "high" | "critical";
+  level: "low" | "medium" | "high" | "critical";
   size?: "sm" | "md" | "lg";
 }
 
 export function RiskBadge({ level, size = "md" }: RiskBadgeProps) {
   const styles: Record<string, string> = {
     low: "bg-emerald-100 text-emerald-800 border-emerald-500",
-    moderate: "bg-amber-100 text-amber-800 border-amber-500",
+    medium: "bg-amber-100 text-amber-800 border-amber-500",
     high: "bg-red-100 text-red-800 border-red-500",
     critical: "bg-red-200 text-red-900 border-red-700",
   };
@@ -21,7 +21,7 @@ export function RiskBadge({ level, size = "md" }: RiskBadgeProps) {
 
   const labels: Record<string, string> = {
     low: "LOW RISK",
-    moderate: "MODERATE",
+    medium: "MEDIUM",
     high: "HIGH RISK",
     critical: "CRITICAL",
   };

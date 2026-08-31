@@ -50,7 +50,7 @@ const schema = defineSchema(
       riskLevel: v.optional(
         v.union(
           v.literal("low"),
-          v.literal("moderate"),
+          v.literal("medium"),
           v.literal("high"),
           v.literal("critical")
         )

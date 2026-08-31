@@ -1,80 +1,122 @@
 import type { ForensicFinding, IntegrityResult } from "./types";
 
-// Weight multipliers for each category
+// ── Category weights ──────────────────────────────────────────────
 const CATEGORY_WEIGHTS: Record<string, number> = {
   metadata: 1.0,
-  image_forensics: 1.3,
-  text_layout: 0.8,
   pdf_structure: 1.2,
+  image_forensics: 1.5,
+  text_layout: 1.0,
+  ocr: 1.0,
   invoice_analysis: 1.5,
   text_image_correlation: 1.8,
+  general: 1.0,
 };
 
-// Severity weights
-const SEVERITY_WEIGHTS: Record<string, number> = {
-  low: 1.0,
-  medium: 2.0,
-  high: 3.5,
+// ── Severity deduction points ─────────────────────────────────────
+const SEVERITY_DEDUCTIONS: Record<string, number> = {
+  low: 5,
+  medium: 12,
+  high: 25,
+  critical: 40,
 };
 
+const VALID_SEVERITIES = new Set(["low", "medium", "high", "critical"]);
+const VALID_CATEGORIES = new Set(Object.keys(CATEGORY_WEIGHTS));
+
+/**
+ * Calculate integrity score from forensic findings.
+ *
+ * Starts at 100 and deducts points based on finding severity and category.
+ * Returns a valid IntegrityResult that is NEVER undefined, null, or NaN.
+ *
+ * @param findings - Array of forensic findings from the analysis pipeline
+ * @param metadata - Analysis metadata (timestamp, file info, modules run)
+ * @returns IntegrityResult with integrityScore (0-100), riskLevel, findings, and metadata
+ */
 export function calculateIntegrityScore(
   findings: ForensicFinding[],
-  metadata: IntegrityResult["metadata"]
+  metadata: IntegrityResult["metadata"],
 ): IntegrityResult {
-  if (findings.length === 0) {
+  // ── Defensive: handle null/undefined/non-array ──
+  const validFindings = Array.isArray(findings) ? findings : [];
+
+  console.log(`[ProofChain SCORE] Findings: ${validFindings.length}`);
+
+  // ── Zero findings: perfect score ──
+  if (validFindings.length === 0) {
+    console.log("[ProofChain SCORE] Total deduction: 0");
+    console.log("[ProofChain SCORE] Final integrity score: 100");
+    console.log("[ProofChain SCORE] Risk level: low");
     return {
       integrityScore: 100,
       riskLevel: "low",
-      findings,
+      findings: [],
       metadata,
     };
   }
 
-  // Calculate weighted penalty from findings
-  let totalPenalty = 0;
-  let maxPossiblePenalty = 0;
+  // ── Calculate deductions ──
+  let totalDeduction = 0;
 
-  for (const finding of findings) {
-    const categoryWeight = CATEGORY_WEIGHTS[finding.category] || 1.0;
-    const severityWeight = SEVERITY_WEIGHTS[finding.severity] || 1.0;
-    const confidenceFactor = finding.confidence / 100;
+  for (const finding of validFindings) {
+    // Defensive: skip malformed findings
+    if (!finding || typeof finding !== "object") continue;
 
-    // Skip "no anomaly" findings in scoring
-    if (finding.finding.toLowerCase().includes("no significant") ||
-        finding.finding.toLowerCase().includes("could not be completed")) {
-      continue;
+    // Normalize category (default to "general" if missing/invalid)
+    const category = VALID_CATEGORIES.has(finding.category)
+      ? finding.category
+      : "general";
+
+    // Normalize severity (skip if invalid — don't silently ignore)
+    const severity = VALID_SEVERITIES.has(finding.severity)
+      ? finding.severity
+      : null;
+    if (!severity) continue;
+
+    const categoryWeight = CATEGORY_WEIGHTS[category] ?? 1.0;
+    const severityPoints = SEVERITY_DEDUCTIONS[severity] ?? 5;
+    const deduction = severityPoints * categoryWeight;
+
+    // Defensive: ensure deduction is numeric
+    if (Number.isFinite(deduction) && deduction > 0) {
+      totalDeduction += deduction;
     }
 
-    const penalty = categoryWeight * severityWeight * confidenceFactor * 10;
-    totalPenalty += penalty;
-    maxPossiblePenalty += categoryWeight * 3.5 * 10; // max severity * max confidence
+    console.log(
+      `[ProofChain SCORE]   ${category} / ${severity} → weight=${categoryWeight} × points=${severityPoints} = deduction=${deduction.toFixed(1)}`,
+    );
   }
 
-  // Score: 100 = no anomalies, 0 = maximum anomalies
-  const score = Math.max(0, Math.min(100, Math.round(100 - totalPenalty)));
+  // Defensive: ensure totalDeduction is numeric
+  if (!Number.isFinite(totalDeduction)) totalDeduction = 0;
 
-  // Determine risk level
-  let riskLevel: "low" | "moderate" | "high" | "critical";
-  if (score >= 80) riskLevel = "low";
-  else if (score >= 55) riskLevel = "moderate";
-  else if (score >= 25) riskLevel = "high";
-  else riskLevel = "critical";
+  // ── Calculate score ──
+  const score = 100 - totalDeduction;
+  const integrityScore = Math.max(0, Math.min(100, Math.round(score)));
 
-  // Count findings by category
-  const categorySummary = {
-    metadata: findings.filter(f => f.category === "metadata").length,
-    image_forensics: findings.filter(f => f.category === "image_forensics").length,
-    text_layout: findings.filter(f => f.category === "text_layout").length,
-    pdf_structure: findings.filter(f => f.category === "pdf_structure").length,
-  };
+  // ── Determine risk level ──
+  let riskLevel: "low" | "medium" | "high";
+  if (integrityScore >= 80) {
+    riskLevel = "low";
+  } else if (integrityScore >= 50) {
+    riskLevel = "medium";
+  } else {
+    riskLevel = "high";
+  }
+
+  console.log(`[ProofChain SCORE] Total deduction: ${totalDeduction.toFixed(1)}`);
+  console.log(`[ProofChain SCORE] Final integrity score: ${integrityScore}`);
+  console.log(`[ProofChain SCORE] Risk level: ${riskLevel}`);
 
   return {
-    integrityScore: score,
+    integrityScore,
     riskLevel,
-    findings,
+    findings: validFindings,
     metadata,
   };
 }
+
+// ── Findings summary helper ───────────────────────────────────────
 
 export function getFindingsSummary(findings: ForensicFinding[]) {
   const categories = [
@@ -86,15 +128,20 @@ export function getFindingsSummary(findings: ForensicFinding[]) {
     { id: "text_layout", label: "Text / Layout", icon: "type" },
   ];
 
-  return categories.map(cat => {
-    const catFindings = findings.filter(f => f.category === cat.id);
+  return categories.map((cat) => {
+    const catFindings = findings.filter((f) => f.category === cat.id);
     const anomalies = catFindings.filter(
-      f => !f.finding.toLowerCase().includes("no significant") &&
-           !f.finding.toLowerCase().includes("could not be completed")
+      (f) =>
+        !f.finding.toLowerCase().includes("no significant") &&
+        !f.finding.toLowerCase().includes("could not be completed"),
     );
-    const avgConfidence = catFindings.length > 0
-      ? Math.round(catFindings.reduce((sum, f) => sum + f.confidence, 0) / catFindings.length)
-      : 0;
+    const avgConfidence =
+      catFindings.length > 0
+        ? Math.round(
+            catFindings.reduce((sum, f) => sum + f.confidence, 0) /
+              catFindings.length,
+          )
+        : 0;
 
     return {
       ...cat,

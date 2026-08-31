@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 interface IntegrityScoreProps {
   score: number;
-  riskLevel: "low" | "moderate" | "high" | "critical";
+  riskLevel: "low" | "medium" | "high" | "critical";
   size?: "md" | "lg";
 }
 
@@ -87,7 +87,7 @@ export function IntegrityScore({ score, riskLevel, size = "lg" }: IntegrityScore
       {isLarge && (
         <p className="text-sm text-muted-foreground text-center max-w-xs">
           {riskLevel === "low" && "No significant anomalies detected in the analysis."}
-          {riskLevel === "moderate" && "Some indicators suggest possible modification. Review findings for details."}
+          {riskLevel === "medium" && "Some indicators suggest possible modification. Review findings for details."}
           {riskLevel === "high" && "Multiple indicators consistent with possible manipulation detected."}
           {riskLevel === "critical" && "Strong evidence of multiple anomalies. Manual review strongly recommended."}
         </p>

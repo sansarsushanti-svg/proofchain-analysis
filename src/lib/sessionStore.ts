@@ -17,7 +17,7 @@ export interface SessionData {
   fileData: string;
   status: "pending" | "analyzing" | "completed" | "failed";
   integrityScore?: number;
-  riskLevel?: "low" | "moderate" | "high" | "critical";
+  riskLevel?: "low" | "medium" | "high" | "critical";
   aiExplanation?: string;
   createdAt: number;
   completedAt?: number;

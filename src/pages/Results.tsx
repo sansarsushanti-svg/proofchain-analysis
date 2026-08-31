@@ -177,7 +177,7 @@ export default function Results() {
       integrityScore: sessionScore,
       riskLevel: sessionRisk as
         | "low"
-        | "moderate"
+        | "medium"
         | "high"
         | "critical",
       findings,

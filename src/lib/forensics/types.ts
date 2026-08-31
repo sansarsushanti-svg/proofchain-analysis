@@ -11,7 +11,7 @@ export interface ForensicFinding {
 
 export interface IntegrityResult {
   integrityScore: number; // 0-100
-  riskLevel: "low" | "moderate" | "high" | "critical";
+  riskLevel: "low" | "medium" | "high" | "critical";
   findings: ForensicFinding[];
   metadata: {
     analysisTimestamp: string;
@@ -42,7 +42,7 @@ export const ANALYSIS_STAGES: AnalysisStage[] = [
 ];
 
 export interface RiskInfo {
-  level: "low" | "moderate" | "high" | "critical";
+  level: "low" | "medium" | "high" | "critical";
   label: string;
   color: string;
   bgColor: string;
@@ -57,10 +57,10 @@ export function getRiskInfo(level: string): RiskInfo {
         color: "text-emerald-700",
         bgColor: "bg-emerald-100",
       };
-    case "moderate":
+    case "medium":
       return {
-        level: "moderate",
-        label: "MODERATE RISK",
+        level: "medium",
+        label: "MEDIUM RISK",
         color: "text-amber-700",
         bgColor: "bg-amber-100",
       };

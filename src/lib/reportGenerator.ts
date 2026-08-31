@@ -13,7 +13,7 @@ function getSeverityIcon(severity: string): string {
 function getRiskColor(riskLevel: string): string {
   switch (riskLevel) {
     case "low": return "#22c55e";
-    case "moderate": return "#f59e0b";
+    case "medium": return "#f59e0b";
     case "high": return "#ef4444";
     case "critical": return "#dc2626";
     default: return "#6b7280";

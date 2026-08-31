@@ -54,7 +54,7 @@ export default function Reports() {
       integrityScore: session.integrityScore ?? 0,
       riskLevel: (session.riskLevel || "low") as
         | "low"
-        | "moderate"
+        | "medium"
         | "high"
         | "critical",
       findings,

@@ -34,7 +34,7 @@ export default function Dashboard() {
     (s) => s.riskLevel === "high" || s.riskLevel === "critical",
   ).length;
   const moderateRisk = recentSessions.filter(
-    (s) => s.riskLevel === "moderate",
+    (s) => s.riskLevel === "medium",
   ).length;
   const lowRisk = recentSessions.filter((s) => s.riskLevel === "low").length;
 

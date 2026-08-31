@@ -1,5 +1,7 @@
 import type { ForensicFinding } from "./types";
 
+const LOG = "[ProofChain]";
+
 function loadImageToCanvas(
   dataUrl: string
 ): Promise<HTMLCanvasElement> {
@@ -122,8 +124,8 @@ function computeNoiseMap(canvas: HTMLCanvasElement): { suspiciousRegions: { x: n
 }
 
 /**
- * Block-level gradient analysis — format-neutral.
- * Compares each block's mean intensity with its neighbors.
+ * Block-level gradient analysis — format-neutral, O(n) via spatial grid.
+ * Compares each block's mean intensity with its spatial neighbors.
  * Flags blocks that deviate significantly from local neighborhood.
  */
 function computeBlockGradientAnomalies(canvas: HTMLCanvasElement): { suspiciousRegions: { x: number; y: number; score: number }[] } {
@@ -137,37 +139,71 @@ function computeBlockGradientAnomalies(canvas: HTMLCanvasElement): { suspiciousR
 
   if (blocks.length === 0) return { suspiciousRegions: [] };
 
+  // Precompute global statistics (single pass)
+  let globalVarianceSum = 0;
+  let globalMeanSum = 0;
+  for (const b of blocks) {
+    globalVarianceSum += b.variance;
+    globalMeanSum += b.mean;
+  }
+  const globalVariance = globalVarianceSum / blocks.length;
+  const globalMean = globalMeanSum / blocks.length;
+
+  // Build spatial grid for O(1) neighbor lookup.
+  // Grid cell size = 48px (the original neighbor radius).
+  // Each block is 16px, so each cell spans ~3 block positions.
+  const GRID_CELL = 48;
+  const gridCols = Math.ceil(width / GRID_CELL) + 1;
+  const grid = new Map<string, typeof blocks>();
+
+  for (const block of blocks) {
+    const gx = Math.floor(block.blockX / GRID_CELL);
+    const gy = Math.floor(block.blockY / GRID_CELL);
+    const key = `${gx},${gy}`;
+    const cell = grid.get(key);
+    if (cell) {
+      cell.push(block);
+    } else {
+      grid.set(key, [block]);
+    }
+  }
+
   const suspiciousRegions: { x: number; y: number; score: number }[] = [];
 
-  for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i];
+  // For each block, only check blocks in the 3×3 grid neighborhood
+  const NEIGHBOR_RADIUS = 48;
+  const threshold = 15;
 
-    // Compute mean difference with neighboring blocks (within 48px)
+  for (const block of blocks) {
+    const gx = Math.floor(block.blockX / GRID_CELL);
+    const gy = Math.floor(block.blockY / GRID_CELL);
+
     let blockDiff = 0;
     let neighbors = 0;
 
-    for (let j = 0; j < blocks.length; j++) {
-      if (i === j) continue;
-      const dist = Math.sqrt(
-        Math.pow(block.blockX - blocks[j].blockX, 2) +
-        Math.pow(block.blockY - blocks[j].blockY, 2)
-      );
-      if (dist <= 48) {
-        blockDiff += Math.abs(block.mean - blocks[j].mean);
-        neighbors++;
+    // Check 3×3 neighborhood of grid cells
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const key = `${gx + dx},${gy + dy}`;
+        const cell = grid.get(key);
+        if (!cell) continue;
+
+        for (const other of cell) {
+          if (other === block) continue;
+          const dist = Math.abs(block.blockX - other.blockX) + Math.abs(block.blockY - other.blockY);
+          if (dist <= NEIGHBOR_RADIUS) {
+            blockDiff += Math.abs(block.mean - other.mean);
+            neighbors++;
+          }
+        }
       }
     }
 
     if (neighbors > 0) blockDiff /= neighbors;
 
-    // Also check variance deviation
-    const globalVariance = blocks.reduce((sum, b) => sum + b.variance, 0) / blocks.length;
     const varianceDeviation = block.variance / (globalVariance || 1);
-    const globalMean = blocks.reduce((sum, b) => sum + b.mean, 0) / blocks.length;
     const meanDeviation = Math.abs(block.mean - globalMean) / (globalMean || 1);
 
-    // Flag blocks with high local gradient or high variance deviation
-    const threshold = 15; // Tuned for rendered document images
     if (blockDiff > threshold || varianceDeviation > 3.0 || meanDeviation > 0.3) {
       suspiciousRegions.push({
         x: block.blockX,
@@ -304,6 +340,7 @@ export async function analyzeImageForensics(
   fileType: string
 ): Promise<ForensicFinding[]> {
   const findings: ForensicFinding[] = [];
+  const t0 = performance.now();
 
   const isJpeg = fileType.includes("jpeg") || fileType.includes("jpg");
   const isPng = fileType.includes("png");
@@ -317,6 +354,7 @@ export async function analyzeImageForensics(
     const canvas = await loadImageToCanvas(dataUrl);
     const width = canvas.width;
     const height = canvas.height;
+    console.log(`${LOG} Image forensics: canvas ${width}x${height}`);
 
     // Check image dimensions
     if (width > 10000 || height > 10000) {
@@ -404,7 +442,12 @@ export async function analyzeImageForensics(
       });
     }
 
+    const elapsed = Math.round(performance.now() - t0);
+    console.log(`${LOG} Image forensics complete: ${elapsed}ms, ${findings.length} finding(s)`);
+
   } catch (error) {
+    const elapsed = Math.round(performance.now() - t0);
+    console.error(`${LOG} Image forensics failed after ${elapsed}ms:`, error);
     findings.push({
       category: "image_forensics",
       finding: "Image analysis could not be completed",

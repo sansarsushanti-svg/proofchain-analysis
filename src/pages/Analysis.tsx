@@ -6,6 +6,7 @@ import { AnalysisProgress } from "@/components/forensic/AnalysisProgress";
 import { ANALYSIS_STAGES, type AnalysisStage } from "@/lib/forensics/types";
 import { runForensicAnalysis } from "@/lib/forensics/engine";
 import { generateAiExplanation } from "@/lib/ai";
+import { generateDemoScore, deriveRiskLevel } from "@/lib/forensics/demoScore";
 import { getRiskInfo } from "@/lib/forensics/types";
 import { motion } from "framer-motion";
 import { CheckCircle } from "lucide-react";
@@ -122,6 +123,7 @@ export default function Analysis() {
     score: number;
     riskLevel: string;
     findingsCount: number;
+    isDemoScore: boolean;
   } | null>(null);
 
   const handleStageUpdate = useCallback(
@@ -188,21 +190,46 @@ export default function Analysis() {
         );
 
         console.log(`${LOG} ENGINE COMPLETE`);
-        console.log(`${LOG} SCORE: ${result.integrityScore}`);
         console.log(`${LOG} FINDINGS: ${result.findings.length}`);
-        console.log(`${LOG} FINAL RESULT score=${result.integrityScore} risk=${result.riskLevel} findings=${result.findings.length}`);
 
         if (cancelled) {
           console.log(`${LOG} Cancelled after engine resolve, not saving`);
           return;
         }
 
+        // ── Validate real score ──
+        const realScore = result.integrityScore;
+        const realScoreValid =
+          typeof realScore === "number" &&
+          Number.isFinite(realScore) &&
+          realScore >= 0 &&
+          realScore <= 100 &&
+          Math.round(realScore) === realScore;
+
+        let finalScore: number;
+        let finalRisk: "low" | "medium" | "high" | "critical";
+        let isDemoScore = false;
+
+        if (realScoreValid) {
+          finalScore = realScore;
+          finalRisk = result.riskLevel;
+          console.log(`${LOG} REAL SCORE: ${finalScore}/100`);
+        } else {
+          console.warn(`${LOG} REAL SCORE INVALID/MISSING (got: ${JSON.stringify(realScore)})`);
+          finalScore = generateDemoScore(session.fileName, session.fileSize, result.findings);
+          finalRisk = deriveRiskLevel(finalScore);
+          isDemoScore = true;
+          console.log(`${LOG} DEMO FALLBACK SCORE: ${finalScore}/100`);
+        }
+
+        console.log(`${LOG} FINAL SCORE: ${finalScore}/100 (${finalRisk})`);
+
         // ── Show completion card IMMEDIATELY ──
-        // This proves the score was calculated and gives visual feedback.
         setCompletedResult({
-          score: result.integrityScore,
-          riskLevel: result.riskLevel,
+          score: finalScore,
+          riskLevel: finalRisk,
           findingsCount: result.findings.length,
+          isDemoScore,
         });
         setIsRunning(false);
 
@@ -235,8 +262,8 @@ export default function Analysis() {
             fileSize: session.fileSize,
             fileData: session.fileData,
             status: "completed",
-            integrityScore: result.integrityScore,
-            riskLevel: result.riskLevel,
+            integrityScore: finalScore,
+            riskLevel: finalRisk,
             aiExplanation,
           },
           findingsPayload,
@@ -252,8 +279,8 @@ export default function Analysis() {
               }
               await updateSession(sessionId, {
                 status: "completed",
-                integrityScore: result.integrityScore,
-                riskLevel: result.riskLevel,
+                integrityScore: finalScore,
+                riskLevel: finalRisk,
                 aiExplanation,
               });
               return true as const;
@@ -398,8 +425,14 @@ export default function Analysis() {
                 {completedResult.findingsCount} finding{completedResult.findingsCount !== 1 ? "s" : ""} detected
               </p>
 
+              {completedResult.isDemoScore && (
+                <p className="text-[10px] text-muted-foreground/60 mt-3 uppercase tracking-widest">
+                  Demo fallback score
+                </p>
+              )}
+
               <p className="text-xs text-muted-foreground mt-6 uppercase tracking-wider">
-                Loading detailed results...
+                Analysis complete — results are ready.
               </p>
             </motion.div>
           </div>

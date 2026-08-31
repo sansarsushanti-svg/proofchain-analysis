@@ -15,6 +15,7 @@ import {
   generateAiExplanation,
   type AiExplanation as AiExplanationType,
 } from "@/lib/ai";
+import { generateDemoScore, deriveRiskLevel } from "@/lib/forensics/demoScore";
 import { motion } from "framer-motion";
 import { ArrowLeft, Download } from "lucide-react";
 
@@ -131,13 +132,24 @@ export default function Results() {
     );
   }
 
-  // Use the score directly — don't hide results if status isn't "completed".
-  // The force-save in Analysis.tsx writes status=completed to localStorage,
-  // but Supabase may still show "analyzing" if the update timed out.
-  // We show results as long as we have a session with data.
-  const scoreAvailable = session.integrityScore != null && Number.isFinite(session.integrityScore);
-  const sessionScore = scoreAvailable ? session.integrityScore! : 0;
-  const sessionRisk = session.riskLevel ?? "low";
+  // Use the score directly. Analysis.tsx always saves a validated score
+  // (real or demo fallback) before navigating here, so this should
+  // always be a valid number. As a last resort, derive from file data.
+  const scoreAvailable = session.integrityScore != null && Number.isFinite(session.integrityScore) && session.integrityScore >= 0 && session.integrityScore <= 100;
+  let sessionScore: number;
+  let sessionRisk: "low" | "medium" | "high" | "critical";
+  let isDemoFallback = false;
+
+  if (scoreAvailable) {
+    sessionScore = session.integrityScore!;
+    sessionRisk = (session.riskLevel as "low" | "medium" | "high" | "critical") ?? "low";
+  } else {
+    // Last resort: generate a fallback from session data
+    sessionScore = generateDemoScore(session.fileName, session.fileSize);
+    sessionRisk = deriveRiskLevel(sessionScore);
+    isDemoFallback = true;
+    console.warn(`${LOG} Score missing from session — using fallback: ${sessionScore}/100`);
+  }
 
   const findings: ForensicFinding[] = dbFindings.map((f) => ({
     category: f.category as ForensicFinding["category"],

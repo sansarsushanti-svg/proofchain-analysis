@@ -116,12 +116,26 @@ function saveLocalFindings(findings: Record<string, FindingData[]>) {
 
 // ── Auth detection ────────────────────────────────────────
 
+/** Race a promise against a timeout. Returns fallback on timeout. */
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 async function getCurrentUserId(): Promise<string | null> {
   if (!isConfigured) return null;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user?.id ?? null;
+  try {
+    const result = await withTimeout(
+      supabase.auth.getUser() as Promise<{ data: { user: { id: string } | null }; error: unknown }>,
+      5_000,
+      { data: { user: null }, error: null },
+    );
+    return result.data.user?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // ── Supabase row mappers ──────────────────────────────────

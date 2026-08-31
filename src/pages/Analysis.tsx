@@ -6,7 +6,9 @@ import { AnalysisProgress } from "@/components/forensic/AnalysisProgress";
 import { ANALYSIS_STAGES, type AnalysisStage } from "@/lib/forensics/types";
 import { runForensicAnalysis } from "@/lib/forensics/engine";
 import { generateAiExplanation } from "@/lib/ai";
+import { getRiskInfo } from "@/lib/forensics/types";
 import { motion } from "framer-motion";
+import { CheckCircle } from "lucide-react";
 
 const LOG = "[ProofChain]";
 
@@ -15,6 +17,9 @@ const SAFETY_TIMEOUT_MS = 120_000; // 2 minutes
 
 /** Maximum time allowed for any persistence operation. */
 const PERSISTENCE_TIMEOUT_MS = 5_000; // 5 seconds
+
+/** How long to show the completion card before navigating to Results. */
+const COMPLETION_DISPLAY_MS = 500;
 
 /** Wrap any promise with a deadline. Resolves with fallback on timeout. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string, fallback: T): Promise<T> {
@@ -112,6 +117,13 @@ export default function Analysis() {
   const [error, setError] = useState<string | null>(null);
   const analysisStarted = useRef(false);
 
+  /** Set when the engine completes successfully — shows completion card. */
+  const [completedResult, setCompletedResult] = useState<{
+    score: number;
+    riskLevel: string;
+    findingsCount: number;
+  } | null>(null);
+
   const handleStageUpdate = useCallback(
     (stageId: string, status: "analyzing" | "completed") => {
       setStages((prev) =>
@@ -178,15 +190,23 @@ export default function Analysis() {
         console.log(`${LOG} ENGINE COMPLETE`);
         console.log(`${LOG} SCORE: ${result.integrityScore}`);
         console.log(`${LOG} FINDINGS: ${result.findings.length}`);
+        console.log(`${LOG} FINAL RESULT score=${result.integrityScore} risk=${result.riskLevel} findings=${result.findings.length}`);
 
         if (cancelled) {
           console.log(`${LOG} Cancelled after engine resolve, not saving`);
           return;
         }
 
+        // ── Show completion card IMMEDIATELY ──
+        // This proves the score was calculated and gives visual feedback.
+        setCompletedResult({
+          score: result.integrityScore,
+          riskLevel: result.riskLevel,
+          findingsCount: result.findings.length,
+        });
+        setIsRunning(false);
+
         // ── Step 1: Force-save to localStorage immediately ──
-        // This guarantees the Results page can load data regardless
-        // of what happens with Supabase or async persistence.
         const findingsPayload = result.findings.map((f) => ({
           category: f.category,
           finding: f.finding,
@@ -252,7 +272,12 @@ export default function Analysis() {
           console.error(`${LOG} PERSISTENCE FAILED:`, persistErr);
         }
 
-        // ── Step 3: Navigate — ALWAYS, regardless of persistence ──
+        // ── Step 3: Wait for completion card to be visible, then navigate ──
+        if (cancelled) return;
+
+        console.log(`${LOG} Waiting ${COMPLETION_DISPLAY_MS}ms for completion display...`);
+        await new Promise<void>((resolve) => setTimeout(resolve, COMPLETION_DISPLAY_MS));
+
         if (cancelled) return;
 
         const resultsUrl = `/results/${sessionId}`;
@@ -278,7 +303,6 @@ export default function Analysis() {
           clearTimeout(safetyTimer);
           safetyTimer = null;
         }
-        // Ensure isRunning is cleared if navigation didn't unmount us
         if (!cancelled) {
           setIsRunning(false);
         }
@@ -293,13 +317,13 @@ export default function Analysis() {
     };
   }, [sessionId, isRunning, handleStageUpdate, navigate]);
 
-  return (
-    <div className="min-h-screen bg-background">
-      <AppNav />
-
-      <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen">
-        <div className="p-6 lg:p-10 max-w-4xl mx-auto">
-          {error ? (
+  // ── Render: Error state ──
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppNav />
+        <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen">
+          <div className="p-6 lg:p-10 max-w-4xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -319,23 +343,91 @@ export default function Analysis() {
                 Try Again
               </button>
             </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <AnalysisProgress
-                stages={stages}
-                currentStageIndex={currentStageIndex}
-              />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
-              <div className="mt-8 text-center">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                  Please do not close this page during analysis
-                </p>
+  // ── Render: Completion card (shown for COMPLETION_DISPLAY_MS before navigating) ──
+  if (completedResult) {
+    const risk = getRiskInfo(completedResult.riskLevel);
+    return (
+      <div className="min-h-screen bg-background">
+        <AppNav />
+        <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen">
+          <div className="p-6 lg:p-10 max-w-4xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="nb-card-lg p-10 text-center"
+            >
+              <div className="w-16 h-16 bg-emerald-100 border-3 border-emerald-300 flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="w-8 h-8 text-emerald-600" />
               </div>
+
+              <h2 className="text-2xl font-black uppercase tracking-wider mb-2">
+                Analysis Complete
+              </h2>
+
+              <div className="mt-6 mb-6">
+                <p className="text-sm text-muted-foreground uppercase tracking-wider mb-3">
+                  Integrity Score
+                </p>
+                <p
+                  className="text-7xl font-black leading-none"
+                  style={{
+                    color:
+                      completedResult.score >= 80 ? "#22c55e" :
+                      completedResult.score >= 55 ? "#f59e0b" :
+                      completedResult.score >= 25 ? "#ef4444" : "#dc2626",
+                  }}
+                >
+                  {completedResult.score}
+                </p>
+                <p className="text-lg text-muted-foreground mt-1">/ 100</p>
+              </div>
+
+              <div
+                className={`inline-block px-4 py-2 border-3 font-black text-sm ${risk.bgColor} ${risk.color}`}
+              >
+                {risk.label}
+              </div>
+
+              <p className="text-sm text-muted-foreground mt-4">
+                {completedResult.findingsCount} finding{completedResult.findingsCount !== 1 ? "s" : ""} detected
+              </p>
+
+              <p className="text-xs text-muted-foreground mt-6 uppercase tracking-wider">
+                Loading detailed results...
+              </p>
             </motion.div>
-          )}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ── Render: Analysis in progress ──
+  return (
+    <div className="min-h-screen bg-background">
+      <AppNav />
+      <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen">
+        <div className="p-6 lg:p-10 max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <AnalysisProgress
+              stages={stages}
+              currentStageIndex={currentStageIndex}
+            />
+            <div className="mt-8 text-center">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                Please do not close this page during analysis
+              </p>
+            </div>
+          </motion.div>
         </div>
       </main>
     </div>

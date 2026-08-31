@@ -51,7 +51,7 @@ export default function Reports() {
     }
 
     const result = {
-      integrityScore: session.integrityScore || 0,
+      integrityScore: session.integrityScore ?? 0,
       riskLevel: (session.riskLevel || "low") as
         | "low"
         | "moderate"

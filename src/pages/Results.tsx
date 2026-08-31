@@ -18,6 +18,11 @@ import {
 import { motion } from "framer-motion";
 import { ArrowLeft, Download } from "lucide-react";
 
+const LOG = "[ProofChain] Results:";
+
+/** Maximum time to wait for session data to load before showing fallback. */
+const LOAD_TIMEOUT_MS = 10_000;
+
 export default function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
@@ -32,16 +37,47 @@ export default function Results() {
       return;
     }
 
+    let cancelled = false;
+    let loadTimer: ReturnType<typeof setTimeout> | null = null;
+
     async function load() {
+      console.log(`${LOG} Loading session ${sessionId}...`);
       const [s, f] = await Promise.all([
         getSession(sessionId!),
         getSessionFindings(sessionId!),
       ]);
+
+      if (cancelled) return;
+
+      console.log(`${LOG} Session loaded: status=${s?.status}, score=${s?.integrityScore}, findings=${f.length}`);
+
+      // If session exists but status is not "completed" yet (e.g. Supabase update
+      // is delayed), still show whatever data we have. The force-save in Analysis.tsx
+      // should have written status=completed to localStorage, but Supabase may lag.
+      if (s && s.status !== "completed" && s.status !== "failed") {
+        console.warn(`${LOG} Session status is '${s.status}', showing available data anyway`);
+      }
+
       setSession(s);
       setDbFindings(f);
       setIsLoading(false);
     }
+
     load();
+
+    // Safety timeout: if loading takes too long (e.g. Supabase auth hangs),
+    // stop showing spinner and show whatever we have (or "not found").
+    loadTimer = setTimeout(() => {
+      if (!cancelled && isLoading) {
+        console.warn(`${LOG} Load timeout after ${LOAD_TIMEOUT_MS / 1000}s`);
+        setIsLoading(false);
+      }
+    }, LOAD_TIMEOUT_MS);
+
+    return () => {
+      cancelled = true;
+      if (loadTimer) clearTimeout(loadTimer);
+    };
   }, [sessionId]);
 
   if (!sessionId) {
@@ -60,7 +96,12 @@ export default function Results() {
       <div className="min-h-screen bg-background">
         <AppNav />
         <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-foreground border-t-transparent animate-spin" />
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-foreground border-t-transparent animate-spin mx-auto mb-4" />
+            <p className="text-sm text-muted-foreground uppercase tracking-wider">
+              Loading results...
+            </p>
+          </div>
         </main>
       </div>
     );
@@ -90,31 +131,12 @@ export default function Results() {
     );
   }
 
-  if (session.status !== "completed") {
-    return (
-      <div className="min-h-screen bg-background">
-        <AppNav />
-        <main className="lg:ml-64 pt-20 lg:pt-0 min-h-screen flex items-center justify-center">
-          <div className="nb-card p-8 text-center max-w-md">
-            <h2 className="text-xl font-black uppercase tracking-wider mb-2">
-              Not Available
-            </h2>
-            <p className="text-sm text-muted-foreground mb-6">
-              {session.status === "failed"
-                ? "This analysis failed to complete."
-                : "This session is still in progress or has not completed."}
-            </p>
-            <button
-              onClick={() => navigate("/upload")}
-              className="nb-btn-primary px-6 py-3 bg-foreground text-background text-sm"
-            >
-              New Analysis
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  // Use the score directly — don't hide results if status isn't "completed".
+  // The force-save in Analysis.tsx writes status=completed to localStorage,
+  // but Supabase may still show "analyzing" if the update timed out.
+  // We show results as long as we have a session with data.
+  const sessionScore = session.integrityScore ?? 100;
+  const sessionRisk = session.riskLevel ?? "low";
 
   const findings: ForensicFinding[] = dbFindings.map((f) => ({
     category: f.category as ForensicFinding["category"],
@@ -133,8 +155,8 @@ export default function Results() {
       aiExplanation = JSON.parse(session.aiExplanation);
     } catch {
       const result = {
-        integrityScore: session.integrityScore || 0,
-        riskLevel: session.riskLevel || "low",
+        integrityScore: sessionScore,
+        riskLevel: sessionRisk,
         findings,
         metadata: {
           analysisTimestamp: new Date(session.createdAt).toISOString(),
@@ -152,8 +174,8 @@ export default function Results() {
 
   const handleDownloadReport = () => {
     const result = {
-      integrityScore: session.integrityScore || 0,
-      riskLevel: (session.riskLevel || "low") as
+      integrityScore: sessionScore,
+      riskLevel: sessionRisk as
         | "low"
         | "moderate"
         | "high"
@@ -223,8 +245,8 @@ export default function Results() {
               >
                 <div className="flex flex-col md:flex-row items-center gap-8">
                   <IntegrityScore
-                    score={session.integrityScore || 0}
-                    riskLevel={session.riskLevel || "low"}
+                    score={sessionScore}
+                    riskLevel={sessionRisk}
                   />
                   <div className="flex-1 w-full">
                     <div className="grid grid-cols-2 gap-3">

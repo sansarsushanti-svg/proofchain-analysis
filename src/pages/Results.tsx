@@ -11,7 +11,7 @@ import { AiExplanation } from "@/components/forensic/AiExplanation";
 import { getFindingsSummary } from "@/lib/forensics/scoring";
 import type { ForensicFinding } from "@/lib/forensics/types";
 import { downloadReport } from "@/lib/reportGenerator";
-import { deriveRiskLevel } from "@/lib/forensics/demoScore";
+import { generateDemoScore, deriveRiskLevel } from "@/lib/forensics/demoScore";
 import {
   generateAiExplanation,
   type AiExplanation as AiExplanationType,
@@ -136,11 +136,11 @@ export default function Results() {
     score = storedScore!;
     riskLevel = (session.riskLevel as "low" | "medium" | "high" | "critical") ?? deriveRiskLevel(score);
   } else {
-    // Last resort: use a fixed fallback of 50 (MEDIUM) — score should never be missing.
-    score = 50;
+    // Last resort: generate from session metadata — score should never be missing.
+    score = generateDemoScore(session.fileName, session.fileSize);
     riskLevel = deriveRiskLevel(score);
     isFallbackScore = true;
-    console.warn(`${LOG} Score missing from session — using fallback: ${score}/100`);
+    console.warn(`${LOG} Score missing from session — generated fallback: ${score}/100`);
   }
 
   console.log(`${LOG} RESULTS SCORE: ${score}/100 (risk: ${riskLevel})`);

@@ -174,7 +174,7 @@ export default function Analysis() {
       // STEP 1: Generate the demo score ONCE from file metadata.
       // This score is stored and NEVER changes during the analysis.
       // ═══════════════════════════════════════════════════════════════
-      const finalScore = generateDemoScore(session.fileName, session.fileSize);
+      const finalScore = generateDemoScore();
       const finalRisk = deriveRiskLevel(finalScore);
 
       console.log(`${LOG} SCORE GENERATED: ${finalScore}/100 (${finalRisk})`);

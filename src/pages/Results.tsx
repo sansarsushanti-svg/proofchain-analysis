@@ -117,9 +117,9 @@ export default function Results() {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // SCORE: ALWAYS generate a valid score. No blank states.
-  // Analysis.tsx saves a demo score to localStorage before navigating here.
-  // If for any reason the score is missing, generate one from session data.
+  // SCORE: Single source of truth = session.integrityScore
+  // Analysis.tsx generates the score ONCE and saves it here.
+  // If somehow missing (should never happen), generate a fallback.
   // ═══════════════════════════════════════════════════════════════
   const storedScore = session.integrityScore;
   const scoreIsValid =
@@ -130,18 +130,20 @@ export default function Results() {
 
   let score: number;
   let riskLevel: "low" | "medium" | "high" | "critical";
+  let isFallbackScore = false;
 
   if (scoreIsValid) {
     score = storedScore!;
     riskLevel = (session.riskLevel as "low" | "medium" | "high" | "critical") ?? deriveRiskLevel(score);
   } else {
-    // Last resort: generate from file metadata
+    // Last resort: generate from session metadata
     score = generateDemoScore(session.fileName, session.fileSize);
     riskLevel = deriveRiskLevel(score);
+    isFallbackScore = true;
     console.warn(`${LOG} Score missing from session — generated fallback: ${score}/100`);
   }
 
-  console.log(`${LOG} RESULTS SCORE: ${score}/100`);
+  console.log(`${LOG} RESULTS SCORE: ${score}/100 (risk: ${riskLevel})`);
 
   const findings: ForensicFinding[] = dbFindings.map((f) => ({
     category: f.category as ForensicFinding["category"],
@@ -223,6 +225,11 @@ export default function Results() {
                   {session.fileName} ·{" "}
                   {new Date(session.createdAt).toLocaleString()}
                 </p>
+                {isFallbackScore && (
+                  <p className="text-xs text-amber-600 font-bold uppercase tracking-wider mt-1">
+                    Simulation Score
+                  </p>
+                )}
               </div>
               <button
                 onClick={handleDownloadReport}

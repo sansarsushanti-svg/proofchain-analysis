@@ -9,6 +9,7 @@ export function useAuth() {
     signIn,
     signOut,
     signUp,
+    resetPassword,
     continueAsGuest,
   } = useSupabaseAuth();
 
@@ -20,6 +21,7 @@ export function useAuth() {
     signIn,
     signOut,
     signUp,
+    resetPassword,
     continueAsGuest,
   };
 }

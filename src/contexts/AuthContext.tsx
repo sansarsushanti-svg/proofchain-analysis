@@ -25,6 +25,9 @@ interface AuthContextType {
     email: string,
     password: string,
   ) => Promise<{ error: AuthError | null }>;
+  resetPassword: (
+    email: string,
+  ) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   continueAsGuest: () => void;
 }
@@ -80,6 +83,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   }, []);
 
+  const resetPassword = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + "/auth",
+    });
+    return { error };
+  }, []);
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     localStorage.removeItem(GUEST_STORAGE_KEY);
@@ -101,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isGuest,
         signUp,
         signIn,
+        resetPassword,
         signOut,
         continueAsGuest,
       }}

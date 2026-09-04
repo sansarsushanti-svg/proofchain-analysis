@@ -27,10 +27,10 @@ function deterministicHash(input: string): number {
  * Returns an integer 0–100. Uses file name + size as a deterministic seed
  * so the same file always produces the same score across repeated runs.
  *
- * Distribution:
- *   75–98 for most documents (≈70%)
- *   45–74 occasionally (≈25%)
- *   20–44 rarely (≈5%)
+ * Distribution is balanced to cover all three risk levels:
+ *   80–100 → LOW RISK   (~33%)
+ *   50–79  → MEDIUM RISK (~33%)
+ *   0–49   → HIGH RISK   (~33%)
  *
  * @param fileName - Optional file name for deterministic seeding
  * @param fileSize - Optional file size for deterministic seeding
@@ -51,23 +51,22 @@ export function generateDemoScore(
 
   const hash = deterministicHash(seed);
 
-  // Determine which range to use based on hash
-  //   0–69   → high range (75–98) — ~70%
-  //   70–94  → mid range (45–74)  — ~25%
-  //   95–99  → low range (20–44)  — ~5%
+  // Use the last two digits of hash for bucket selection (0-99)
+  // and the third digit for intra-range position
   const bucket = hash % 100;
+  const position = (Math.floor(hash / 100)) % 100; // 0-99 for position within range
 
   let score: number;
 
-  if (bucket < 70) {
-    // High range: 75–98
-    score = 75 + (hash % 24);
-  } else if (bucket < 95) {
-    // Mid range: 45–74
-    score = 45 + (hash % 30);
+  if (bucket < 33) {
+    // LOW risk: 80–100
+    score = 80 + Math.floor((position / 99) * 21);
+  } else if (bucket < 66) {
+    // MEDIUM risk: 50–79
+    score = 50 + Math.floor((position / 99) * 30);
   } else {
-    // Low range: 20–44
-    score = 20 + (hash % 25);
+    // HIGH risk: 0–49
+    score = Math.floor((position / 99) * 50);
   }
 
   // Defensive clamp

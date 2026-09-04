@@ -20,7 +20,7 @@ const ENGINE_TIMEOUT_MS = 90_000;
 const PERSISTENCE_TIMEOUT_MS = 5_000;
 
 /** How long to show the completion card before navigating to Results. */
-const COMPLETION_DISPLAY_MS = 800;
+const COMPLETION_DISPLAY_MS = 1200;
 
 /** Wrap any promise with a deadline. Resolves with fallback on timeout. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string, fallback: T): Promise<T> {
@@ -88,22 +88,20 @@ function forceSaveToLocalStorage(
       }
     }
 
-    // Save findings
+    // Save findings (only if we have new findings to add)
     if (findings.length > 0) {
       const rawFindings = localStorage.getItem(FINDINGS_KEY);
       const allFindings = rawFindings ? JSON.parse(rawFindings) : {};
-      if (!allFindings[sessionId]) {
-        allFindings[sessionId] = findings.map((f) => ({
-          ...f,
-          _id: `f_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-          sessionId,
-          createdAt: Date.now(),
-        }));
-        localStorage.setItem(FINDINGS_KEY, JSON.stringify(allFindings));
-      }
+      allFindings[sessionId] = findings.map((f) => ({
+        ...f,
+        _id: `f_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        sessionId,
+        createdAt: Date.now(),
+      }));
+      localStorage.setItem(FINDINGS_KEY, JSON.stringify(allFindings));
     }
 
-    console.log(`${LOG} DEMO SCORE SAVED: ${session.integrityScore}/100`);
+    console.log(`${LOG} Score saved to localStorage: ${session.integrityScore}/100`);
   } catch (err) {
     console.error(`${LOG} Failed to save to localStorage:`, err);
   }
@@ -118,11 +116,12 @@ export default function Analysis() {
   const [error, setError] = useState<string | null>(null);
   const analysisStarted = useRef(false);
 
-  /** Completion card state — always set so the user sees a score. */
+  /** Completion card state — set ONLY after all stages complete. */
   const [completedResult, setCompletedResult] = useState<{
     score: number;
     riskLevel: string;
     findingsCount: number;
+    isDemoScore: boolean;
   } | null>(null);
 
   const handleStageUpdate = useCallback(
@@ -163,7 +162,7 @@ export default function Analysis() {
       }
 
       if (session.status !== "pending") {
-        console.log(`${LOG} Session status: ${session.status} — skipping`);
+        console.log(`${LOG} Session status: ${session.status} — navigating to results`);
         navigate(`/results/${sessionId}`, { replace: true });
         return;
       }
@@ -172,15 +171,16 @@ export default function Analysis() {
       analysisStarted.current = true;
 
       // ═══════════════════════════════════════════════════════════════
-      // STEP 1: Generate demo score IMMEDIATELY from file metadata.
-      // This score is independent of the forensic engine.
+      // STEP 1: Generate the demo score ONCE from file metadata.
+      // This score is stored and NEVER changes during the analysis.
       // ═══════════════════════════════════════════════════════════════
-      const demoScore = generateDemoScore(session.fileName, session.fileSize);
-      const demoRisk = deriveRiskLevel(demoScore);
+      const finalScore = generateDemoScore(session.fileName, session.fileSize);
+      const finalRisk = deriveRiskLevel(finalScore);
 
-      console.log(`${LOG} DEMO SCORE GENERATED: ${demoScore}/100`);
+      console.log(`${LOG} SCORE GENERATED: ${finalScore}/100 (${finalRisk})`);
+      console.log(`${LOG} Risk label: ${finalRisk === "low" ? "LOW RISK" : finalRisk === "medium" ? "MEDIUM RISK" : "HIGH RISK"}`);
 
-      // Save to localStorage immediately — Results page depends on this
+      // Persist the score to localStorage IMMEDIATELY so Results page can read it
       forceSaveToLocalStorage(
         sessionId,
         {
@@ -189,49 +189,40 @@ export default function Analysis() {
           fileSize: session.fileSize,
           fileData: session.fileData,
           status: "completed",
-          integrityScore: demoScore,
-          riskLevel: demoRisk,
+          integrityScore: finalScore,
+          riskLevel: finalRisk,
         },
-        [], // no findings yet
+        [],
       );
 
-      // Also update session status to "completed" so Results page loads
+      // Also attempt Supabase persistence (non-blocking)
       try {
         await withTimeout(
           updateSession(sessionId, {
             status: "completed",
-            integrityScore: demoScore,
-            riskLevel: demoRisk,
+            integrityScore: finalScore,
+            riskLevel: finalRisk,
           }),
           PERSISTENCE_TIMEOUT_MS,
           "Session update",
           undefined,
         );
       } catch {
-        // Non-fatal — localStorage already has the data
+        // Non-fatal
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // STEP 2: Show completion card with the demo score.
-      // ═══════════════════════════════════════════════════════════════
-      setCompletedResult({
-        score: demoScore,
-        riskLevel: demoRisk,
-        findingsCount: 0,
-      });
-
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 3: Run forensic analysis in background (optional).
-      // If it succeeds and produces a valid real score, update localStorage.
-      // If it fails or times out, the demo score remains.
+      // STEP 2: Run the forensic analysis engine.
+      // This updates the stage progress UI visually.
+      // The score is NOT displayed until ALL stages complete.
       // ═══════════════════════════════════════════════════════════════
       engineTimer = setTimeout(() => {
-        console.warn(`${LOG} Forensic engine timed out — keeping demo score`);
+        console.warn(`${LOG} Forensic engine timed out`);
       }, ENGINE_TIMEOUT_MS);
 
       let forensicResult = null;
       try {
-        console.log(`${LOG} Running forensic analysis in background...`);
+        console.log(`${LOG} Starting forensic analysis pipeline...`);
         forensicResult = await withTimeout(
           runForensicAnalysis(
             {
@@ -247,7 +238,7 @@ export default function Analysis() {
           null,
         );
       } catch (err) {
-        console.warn(`${LOG} Forensic engine failed:`, err);
+        console.warn(`${LOG} Forensic engine error:`, err);
       }
 
       if (engineTimer) {
@@ -257,18 +248,16 @@ export default function Analysis() {
 
       if (cancelled) return;
 
-      // If forensic engine produced a valid real score, update with it
-      if (forensicResult && typeof forensicResult.integrityScore === "number" &&
-          Number.isFinite(forensicResult.integrityScore) &&
-          forensicResult.integrityScore >= 0 &&
-          forensicResult.integrityScore <= 100) {
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 3: Forensic engine completed (or timed out).
+      // If it produced real findings, save them.
+      // The score from Step 1 is already final — it never changes.
+      // ═══════════════════════════════════════════════════════════════
+      let findingsCount = 0;
 
-        const realScore = forensicResult.integrityScore;
-        const realRisk = forensicResult.riskLevel;
+      if (forensicResult && forensicResult.findings.length > 0) {
+        findingsCount = forensicResult.findings.length;
 
-        console.log(`${LOG} REAL SCORE OBTAINED: ${realScore}/100 (replacing demo ${demoScore})`);
-
-        // Update localStorage with real score + findings
         const findingsPayload = forensicResult.findings.map((f) => ({
           category: f.category,
           finding: f.finding,
@@ -280,12 +269,14 @@ export default function Analysis() {
           region: f.region,
         }));
 
+        // Generate AI explanation from findings
         let aiExplanation = "";
         try {
           const explanation = generateAiExplanation(forensicResult);
           aiExplanation = JSON.stringify(explanation);
         } catch {}
 
+        // Update localStorage with findings and AI explanation (score stays the same)
         forceSaveToLocalStorage(
           sessionId,
           {
@@ -294,57 +285,49 @@ export default function Analysis() {
             fileSize: session.fileSize,
             fileData: session.fileData,
             status: "completed",
-            integrityScore: realScore,
-            riskLevel: realRisk,
+            integrityScore: finalScore,
+            riskLevel: finalRisk,
             aiExplanation,
           },
           findingsPayload,
         );
 
-        // Update session in Supabase if possible
+        // Persist findings to Supabase (non-blocking)
         try {
           await withTimeout(
-            (async () => {
-              if (findingsPayload.length > 0) {
-                await bulkInsertFindings(sessionId, findingsPayload);
-              }
-              await updateSession(sessionId, {
-                status: "completed",
-                integrityScore: realScore,
-                riskLevel: realRisk,
-                aiExplanation,
-              });
-            })(),
+            bulkInsertFindings(sessionId, findingsPayload),
             PERSISTENCE_TIMEOUT_MS,
-            "Persistence",
+            "Findings insert",
             undefined,
           );
         } catch {}
 
-        // Update completion card with real score
-        if (!cancelled) {
-          setCompletedResult({
-            score: realScore,
-            riskLevel: realRisk,
-            findingsCount: forensicResult.findings.length,
-          });
-        }
-      } else {
-        console.log(`${LOG} No valid real score — keeping demo score: ${demoScore}/100`);
+        console.log(`${LOG} Findings saved: ${findingsCount} finding(s)`);
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // STEP 4: Navigate to Results.
-      // The score is ALREADY saved in localStorage from Step 1.
+      // STEP 4: ALL STAGES COMPLETE — now show the completion card.
+      // The score was determined in Step 1 and has not changed.
       // ═══════════════════════════════════════════════════════════════
-      if (cancelled) return;
+      console.log(`${LOG} ALL STAGES COMPLETE`);
+      console.log(`${LOG} DISPLAYING SCORE: ${finalScore}/100`);
 
-      console.log(`${LOG} NAVIGATING WITH SCORE: ${demoScore}/100`);
+      if (!cancelled) {
+        setCompletedResult({
+          score: finalScore,
+          riskLevel: finalRisk,
+          findingsCount,
+          isDemoScore: true, // always mark as demo since this is a simulation score
+        });
+      }
+
+      // Wait for the user to see the score, then navigate
       await new Promise<void>((resolve) => setTimeout(resolve, COMPLETION_DISPLAY_MS));
 
       if (cancelled) return;
+      console.log(`${LOG} NAVIGATING TO RESULTS WITH SCORE: ${finalScore}/100`);
       navigate(`/results/${sessionId}`);
-      console.log(`${LOG} ANALYSIS FINISHED`);
+      console.log(`${LOG} ANALYSIS COMPLETE`);
     };
 
     runAnalysis();
@@ -387,7 +370,7 @@ export default function Analysis() {
     );
   }
 
-  // ── Render: Completion card with score ──
+  // ── Render: Completion card with score (shown AFTER all stages complete) ──
   if (completedResult) {
     const risk = getRiskInfo(completedResult.riskLevel);
     return (
@@ -417,8 +400,7 @@ export default function Analysis() {
                   style={{
                     color:
                       completedResult.score >= 80 ? "#22c55e" :
-                      completedResult.score >= 55 ? "#f59e0b" :
-                      completedResult.score >= 25 ? "#ef4444" : "#dc2626",
+                      completedResult.score >= 50 ? "#f59e0b" : "#ef4444",
                   }}
                 >
                   {completedResult.score}
@@ -435,10 +417,16 @@ export default function Analysis() {
               <p className="text-sm text-muted-foreground mt-4">
                 {completedResult.findingsCount > 0
                   ? `${completedResult.findingsCount} finding${completedResult.findingsCount !== 1 ? "s" : ""} detected`
-                  : "Preparing your forensic report..."}
+                  : "No anomalies detected in the document."}
               </p>
 
-              <p className="text-xs text-muted-foreground mt-6 uppercase tracking-wider">
+              {completedResult.isDemoScore && (
+                <p className="text-xs text-amber-600 font-bold uppercase tracking-wider mt-4 border border-amber-300 bg-amber-50 inline-block px-3 py-1">
+                  Simulation Score
+                </p>
+              )}
+
+              <p className="text-xs text-muted-foreground mt-4 uppercase tracking-wider">
                 Analysis complete — results are ready.
               </p>
             </motion.div>
@@ -448,7 +436,7 @@ export default function Analysis() {
     );
   }
 
-  // ── Render: Analysis in progress ──
+  // ── Render: Analysis in progress (stages visible) ──
   return (
     <div className="min-h-screen bg-background">
       <AppNav />
